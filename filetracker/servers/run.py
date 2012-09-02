@@ -7,6 +7,7 @@ import sys
 from optparse import OptionParser
 import tempfile
 import subprocess
+import signal
 
 import filetracker.servers.files
 
@@ -29,6 +30,9 @@ def main(args=None):
                  "environment variable if not present)")
     parser.add_option('-L', '--log', dest='log', default=None,
             help="Log file location (no log by default)")
+    parser.add_option('-D', '--no-daemon', dest='daemonize',
+            action='store_false', default=True,
+            help="Do not daemonize, stay in foreground")
 
     options, args = parser.parse_args(args)
     if args:
@@ -90,7 +94,7 @@ def main(args=None):
         conf_file.close()
 
         env = os.environ.copy()
-        if sys.platform == 'darwin':
+        if sys.platform == 'darwin' or not options.daemonize:
             # setsid(1) is not available on Mac
             args = []
         else:
@@ -104,7 +108,16 @@ def main(args=None):
         else:
             args += ['lighttpd', '-f', conf_path]
 
-        retval = subprocess.call(args, env=env)
+        if not options.daemonize:
+            args.append('-D')
+
+        popen = subprocess.Popen(args, env=env)
+        signal.signal(signal.SIGINT, lambda signum, frame: popen.terminate())
+        signal.signal(signal.SIGTERM, lambda signum, frame: popen.terminate())
+        popen.communicate()
+        retval = popen.returncode
+        if not options.daemonize:
+            sys.exit(retval)
         if retval:
             raise RuntimeError("LightHTTPd exited with code %d" % retval)
     finally:
@@ -114,4 +127,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-
