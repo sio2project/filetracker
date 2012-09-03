@@ -66,7 +66,7 @@ class DummyDataStore(DataStore):
         key, version = self._parse_name(name)
         if version is not None and self.versions[key] != version:
             raise KeyError("Version %s of %s not found" % (version, key))
-        return StringIO(self.data[name]), \
+        return StringIO(self.data[key]), \
                 versioned_name(key, self.versions[key])
 
     def delete_file(self, name):
@@ -75,8 +75,8 @@ class DummyDataStore(DataStore):
             return
         if version is not None and self.versions[key] != version:
             return
-        del self.data[name]
-        del self.versions[name]
+        del self.data[key]
+        del self.versions[key]
 
 class DummyClient(Client):
     """Filetracker client which uses a dummy local data store."""
