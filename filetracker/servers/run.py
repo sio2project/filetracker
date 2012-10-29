@@ -33,6 +33,9 @@ def main(args=None):
     parser.add_option('-D', '--no-daemon', dest='daemonize',
             action='store_false', default=True,
             help="Do not daemonize, stay in foreground")
+    parser.add_option('--lighttpd-bin', dest='lighttpd_bin',
+            default='lighttpd',
+            help="Specify the lighttpd binary to use")
 
     options, args = parser.parse_args(args)
     if args:
@@ -106,7 +109,7 @@ def main(args=None):
             env['LD_LIBRARY_PATH'] = server_dir + ':' \
                     + env.get('LD_LIBRARY_PATH', '')
         else:
-            args += ['lighttpd', '-f', conf_path]
+            args += [options.lighttpd_bin, '-f', conf_path]
 
         if not options.daemonize:
             args.append('-D')
