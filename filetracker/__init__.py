@@ -111,7 +111,7 @@ import time
 
 logger = logging.getLogger('filetracker')
 
-class FiletrackerError(Exception):
+class FiletrackerError(StandardError):
     pass
 
 def split_name(name):
