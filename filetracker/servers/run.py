@@ -53,7 +53,7 @@ def main(args=None):
             server.document-root = "%(docroot)s"
             server.port = %(port)d
             server.bind = "%(listen_on)s"
-            server.modules = ( "mod_fastcgi", "mod_status" )
+            server.modules = ( "mod_fastcgi", "mod_status", "mod_accesslog" )
             status.status-url = "/status"
             #debug.log-response-header = "enable"
             #debug.log-request-header = "enable"
@@ -86,7 +86,6 @@ def main(args=None):
 
     if options.log:
         LIGHTHTTPD_CONF += """
-                server.modules += ( "mod_accesslog" )
                 accesslog.filename = "%(log)s"
             """ % dict(log=os.path.abspath(options.log))
 
