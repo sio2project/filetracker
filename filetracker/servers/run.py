@@ -114,7 +114,11 @@ def main(args=None):
         if not options.daemonize:
             args.append('-D')
 
-        popen = subprocess.Popen(args, env=env)
+        try:
+            popen = subprocess.Popen(args, env=env)
+        except OSError, e:
+            raise RuntimeError("Cannot run lighttpd:\n%s" % e)
+
         signal.signal(signal.SIGINT, lambda signum, frame: popen.terminate())
         signal.signal(signal.SIGTERM, lambda signum, frame: popen.terminate())
         popen.communicate()
@@ -122,7 +126,7 @@ def main(args=None):
         if not options.daemonize:
             sys.exit(retval)
         if retval:
-            raise RuntimeError("LightHTTPd exited with code %d" % retval)
+            raise RuntimeError("Lighttpd exited with code %d" % retval)
     finally:
         # At this point lighttpd does not need the configuration file, so it
         # can be safely deleted.
