@@ -25,7 +25,7 @@ class DummyDataStore(DataStore):
         key, version = self._parse_name(name)
         existing_verion = self.versions[key]
         if version is not None and existing_verion > version:
-            return existing_verion
+            return versioned_name(key, existing_verion)
         if version is None:
             version = max(self.versions[key] + 1, int(time.time()))
 
