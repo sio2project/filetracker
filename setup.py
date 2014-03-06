@@ -13,7 +13,6 @@ setup(
     install_requires = [
         'poster >= 0.7',
         'flup',
-        'simplejson',
     ],
 
     entry_points = {
