@@ -2,7 +2,8 @@
 
 """A script for starting filetracker server using lighttpd."""
 
-import os, os.path
+import os
+import os.path
 import sys
 from optparse import OptionParser
 import tempfile
@@ -13,6 +14,7 @@ import filetracker.servers.files
 
 # Clients may use this as a sensible default port to connect to.
 DEFAULT_PORT = 9999
+
 
 def main(args=None):
     epilog = "If LIGHTTPD_DIR is set in environment, it is assumed that " \
