@@ -3,7 +3,8 @@ from collections import defaultdict
 import time
 
 from filetracker import Client, DataStore, _check_name, split_name, \
-        versioned_name
+    versioned_name
+
 
 class DummyDataStore(DataStore):
     """A dummy data store which uses memory to store files.
@@ -67,7 +68,7 @@ class DummyDataStore(DataStore):
         if version is not None and self.versions[key] != version:
             raise KeyError("Version %s of %s not found" % (version, key))
         return StringIO(self.data[key]), \
-                versioned_name(key, self.versions[key])
+               versioned_name(key, self.versions[key])
 
     def delete_file(self, name):
         key, version = self._parse_name(name)
@@ -77,6 +78,7 @@ class DummyDataStore(DataStore):
             return
         del self.data[key]
         del self.versions[key]
+
 
 class DummyClient(Client):
     """Filetracker client which uses a dummy local data store."""

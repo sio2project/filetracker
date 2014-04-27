@@ -98,7 +98,8 @@
 """
 
 import errno
-import os, os.path
+import os
+import os.path
 import shutil
 import functools
 import logging
@@ -111,8 +112,10 @@ import time
 
 logger = logging.getLogger('filetracker')
 
+
 class FiletrackerError(StandardError):
     pass
+
 
 def split_name(name):
     """Splits a (possibly versioned) name into unversioned name and version.
@@ -130,6 +133,7 @@ def split_name(name):
             raise ValueError("Invalid Filetracker filename: version must "
                              "be int, not %r" % (s[1],))
 
+
 def versioned_name(unversioned_name, version):
     """Joins an unversioned name with the specified version.
 
@@ -137,10 +141,11 @@ def versioned_name(unversioned_name, version):
     """
     return unversioned_name + '@' + str(version)
 
+
 def _check_name(name, allow_version=True):
     if not isinstance(name, basestring):
         raise ValueError("Invalid Filetracker filename: not string: %r" %
-                (name,))
+                        (name,))
     parts = name.split('/')
     if not parts:
         raise ValueError("Invalid Filetracker filename: empty name")
@@ -156,6 +161,7 @@ def _check_name(name, allow_version=True):
         raise ValueError("Invalid Filetracker filename: version not allowed "
                          "in this API call")
 
+
 def _report_timing(name):
     def decorator(fn):
         @functools.wraps(fn)
@@ -169,11 +175,14 @@ def _report_timing(name):
         return wrapped
     return decorator
 
+
 def _file_version(path):
     return int(os.stat(path).st_mtime)
 
+
 def _file_size(path):
     return int(os.stat(path).st_size)
+
 
 def _save_stream(path, stream, version=None):
     dir = os.path.dirname(path)
@@ -277,6 +286,12 @@ class DataStore(object):
         """
         raise NotImplementedError
 
+    def get_dir_listing(self):
+        """Returns a list of all stored files, along with the dates of
+           last modification.
+        """
+        raise NotImplementedError
+
 
 class LocalDataStore(DataStore):
     """Data store which uses local filesystem.
@@ -335,6 +350,16 @@ class LocalDataStore(DataStore):
         except OSError:
             pass
 
+    def get_dir_listing(self):
+        result = []
+        for root, dirs, files in os.walk(self.dir):
+            for basename in files:
+                relative_dir = os.path.relpath(root, self.dir)
+                relative_basename = os.path.join(relative_dir, basename)
+                result.append((relative_basename, os.path.getmtime(
+                    os.path.join(root, basename))))
+        return result
+
 
 def _verbose_http_errors(fn):
     @functools.wraps(fn)
@@ -345,6 +370,7 @@ def _verbose_http_errors(fn):
             message = e.info().get('x-exception') or e.read()
             raise FiletrackerError("HTTP/%d: %s" % (e.code, message))
     return wrapped
+
 
 class RemoteDataStore(DataStore):
     """Data store which uses a remote HTTP server.
@@ -390,7 +416,7 @@ class RemoteDataStore(DataStore):
                  'Last-Modified': email.utils.formatdate(version)})
         req.get_method = lambda: 'PUT'
         opener = urllib2.build_opener(
-                poster.streaminghttp.StreamingHTTPHandler)
+            poster.streaminghttp.StreamingHTTPHandler)
         response = opener.open(req)
         name, version = split_name(name)
         return versioned_name(name, self._parse_last_modified(response))
@@ -438,7 +464,7 @@ class RemoteDataStore(DataStore):
 
     @_verbose_http_errors
     def delete_file(self, filename):
-        url, version = self._parse_name(name)
+        url, version = self._parse_name(filename)
         request = urllib2.Request(url)
         if version is not None:
             request.add_header('Last-Modified', email.util.formatdate(version))
@@ -447,8 +473,9 @@ class RemoteDataStore(DataStore):
             urllib2.urlopen(request)
         except urllib2.HTTPError, r:
             if r.code != 404:
-                logger.warning('Error when deleting file %s '
-                        'from %s.' % (name, self.base_url))
+                logger.warning('Error when deleting file %s from %s.'
+                               % (filename, self.base_url))
+
 
 class LockManager(object):
     """An abstract class representing a lock manager.
@@ -486,6 +513,7 @@ class LockManager(object):
            version specification, but it must be ignored.
         """
         raise NotImplementedError
+
 
 class FcntlLockManager(LockManager):
     """A :class:`LockManager` using ``fcntl.flock``."""
@@ -537,6 +565,7 @@ class FcntlLockManager(LockManager):
                 raise
         return self.FcntlLock(path)
 
+
 class NoOpLockManager(LockManager):
     """A no-op :class:`LockManager`.
 
@@ -547,14 +576,17 @@ class NoOpLockManager(LockManager):
     class NoOpLock(LockManager.Lock):
         def lock_shared(self):
             pass
+
         def lock_exclusive(self):
             pass
+
         def unlock(self):
             pass
 
     def lock_for(self, name):
         _check_name(name)
         return self.NoOpLock()
+
 
 class Client(object):
     """The main filetracker client class.
@@ -573,7 +605,7 @@ class Client(object):
            metadata locally --- this can be safely used by multiple processes
            on the same machine, too.
 
-       Another way to create a client is to pass these values as constuctor
+       Another way to create a client is to pass these values as constructor
        arguments --- ``remote_url`` and ``cache_dir``.
 
        If you are the power-user, you may create the client by manually passing
@@ -581,10 +613,9 @@ class Client(object):
        :ref:`filetracker_api`).
     """
 
-    def __init__(self, local_store='auto',
-            remote_store='auto', lock_manager='auto',
-            cache_dir=None, remote_url=None,
-            locks_dir=None):
+    def __init__(self, local_store='auto', remote_store='auto',
+                 lock_manager='auto', cache_dir=None, remote_url=None,
+                 locks_dir=None):
         if cache_dir is None:
             cache_dir = os.environ.get('FILETRACKER_DIR')
         if cache_dir is None:
@@ -629,7 +660,7 @@ class Client(object):
                     % (name, filename), exc_info=True)
 
     def get_file(self, name, save_to, add_to_cache=True,
-            force_refresh=False, _lock_exclusive=False):
+                 force_refresh=False, _lock_exclusive=False):
         """Retrieves file identified by ``name``.
 
            The file is saved as ``save_to``. If ``add_to_cache`` is ``True``,
@@ -663,7 +694,7 @@ class Client(object):
         logger.debug('    downloading %s', name)
         try:
             if not self.remote_store or (version is not None
-                    and not force_refresh):
+                                         and not force_refresh):
                 try:
                     if self.local_store.exists(name):
                         return self.local_store.get_file(name, save_to)
@@ -677,7 +708,7 @@ class Client(object):
                 if not _lock_exclusive and add_to_cache:
                     lock.unlock()
                     return self.get_file(name, save_to, add_to_cache,
-                            _lock_exclusive=True)
+                                         _lock_exclusive=True)
                 vname = self.remote_store.get_file(name, save_to)
                 if add_to_cache:
                     self._add_to_cache(vname, save_to)
@@ -707,14 +738,14 @@ class Client(object):
 
         try:
             if not self.remote_store or (version is not None
-                    and not force_refresh):
+                                         and not force_refresh):
                 try:
                     if self.local_store.exists(name):
                         return self.local_store.get_stream(name)
                 except Exception:
                     if self.remote_store:
                         logger.warning("Error getting '%s' from local store",
-                                name, exc_info=True)
+                                       name, exc_info=True)
                     else:
                         raise
             if self.remote_store:
@@ -727,7 +758,7 @@ class Client(object):
     def file_version(self, name):
         """Returns the newest available version number of the file.
 
-           If the remote store is configured, it is quieried, otherwise
+           If the remote store is configured, it is queried, otherwise
            the local version is returned. It is assumed that the remote store
            always has the newest version of the file.
 
@@ -752,14 +783,14 @@ class Client(object):
         logger.debug('    querying size of %s', name)
         try:
             if not self.remote_store or (version is not None
-                    and not force_refresh):
+                                         and not force_refresh):
                 try:
                     if self.local_store.exists(name):
                         return self.local_store.file_size(name)
                 except Exception:
                     if self.remote_store:
                         logger.warning("Error getting '%s' from local store",
-                                name, exc_info=True)
+                                       name, exc_info=True)
                     else:
                         raise
             if self.remote_store:
@@ -769,7 +800,7 @@ class Client(object):
             logger.debug('    processed %s in %.2fs', name, time.time() - t)
 
     def put_file(self, name, filename, to_local_store=True,
-            to_remote_store=True):
+                 to_remote_store=True):
         """Adds file ``filename`` to the filetracker under the name ``name``.
 
            If the file already exists, a new version is created. In practice
@@ -822,3 +853,9 @@ class Client(object):
                 lock.close()
         if self.remote_store:
             self.remote_store.delete_file(name)
+
+    def get_dir_listing(self):
+        result = []
+        if self.local_store:
+            result.extend(self.local_store.get_dir_listing())
+        return result
