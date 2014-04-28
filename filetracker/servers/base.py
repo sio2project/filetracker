@@ -1,7 +1,9 @@
-import socket, errno
+import socket
+import errno
 import os
 import sys
 import traceback
+
 
 class Server(object):
     """A base WSGI-compatible class, which delegates request handling to
@@ -20,21 +22,25 @@ class Server(object):
             start_response(status, response_headers, sys.exc_info())
             return [traceback.format_exc()]
 
+
 def start_cgi(server):
     from flup.server.cgi import WSGIServer
     WSGIServer(server).run()
     sys.exit(0)
+
 
 def start_fcgi(server):
     from flup.server.fcgi import WSGIServer
     WSGIServer(server).run()
     sys.exit(0)
 
+
 def start_standalone(server, port=8000):
     from wsgiref.simple_server import make_server
     httpd = make_server('', port, server)
     print "Serving on port %d..." % port
     httpd.serve_forever()
+
 
 def main(server):
     """A convenience ``main`` method for running WSGI-compatible HTTP
@@ -51,4 +57,3 @@ def main(server):
             start_fcgi(server)
 
     start_standalone(server)
-
