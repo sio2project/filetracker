@@ -277,6 +277,12 @@ class DataStore(object):
         """
         raise NotImplementedError
 
+    def get_dir_listing(self):
+        """Returns a list of all stored files, along with the dates of
+           last modification.
+        """
+        raise NotImplementedError
+
 
 class LocalDataStore(DataStore):
     """Data store which uses local filesystem.
@@ -334,6 +340,16 @@ class LocalDataStore(DataStore):
             os.removedirs(os.path.dirname(path))
         except OSError:
             pass
+
+    def get_dir_listing(self):
+        result = []
+        for root, dirs, files in os.walk(self.dir):
+            for basename in files:
+                relative_dir = os.path.relpath(root, self.dir)
+                relative_basename = os.path.join(relative_dir, basename)
+                result.append((relative_basename, os.path.getmtime(
+                    os.path.join(root, basename))))
+        return result
 
 
 def _verbose_http_errors(fn):
@@ -822,3 +838,9 @@ class Client(object):
                 lock.close()
         if self.remote_store:
             self.remote_store.delete_file(name)
+
+    def get_dir_listing(self):
+        result = []
+        if self.local_store:
+            result.extend(self.local_store.get_dir_listing())
+        return result
