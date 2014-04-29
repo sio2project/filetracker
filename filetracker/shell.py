@@ -7,11 +7,13 @@ import tempfile
 
 from filetracker import Client
 
+
 def _make_command_parser(cmd, extra_usage=''):
     usage = "usage: %prog [options] command [command-specific options] " \
             + extra_usage
     description = "Help for command '%s'" % cmd
     return OptionParser(usage=usage, description=description)
+
 
 def _make_get_parser(*args, **kwargs):
     parser = _make_command_parser(*args, **kwargs)
@@ -23,9 +25,11 @@ def _make_get_parser(*args, **kwargs):
             help="Do not read from the local cache")
     return parser
 
+
 def _make_get_kwargs(options):
     return dict(add_to_cache=options.add_to_cache,
                 force_refresh=options.force_refresh)
+
 
 def cmd_get(client, *args):
     parser = _make_get_parser('get', "name local_filename")
@@ -38,6 +42,7 @@ def cmd_get(client, *args):
         parser.error("Too many arguments")
     client.get_file(args[0], args[1], **_make_get_kwargs(options))
 
+
 def cmd_cat(client, *args):
     tmpdir = tempfile.mkdtemp()
     try:
@@ -47,6 +52,7 @@ def cmd_cat(client, *args):
         shutil.copyfileobj(open(out_filename, 'rb'), sys.stdout)
     finally:
         shutil.rmtree(tmpdir)
+
 
 def cmd_put(client, *args):
     parser = _make_command_parser('put', "local_filename name")
@@ -66,6 +72,7 @@ def cmd_put(client, *args):
     print client.put_file(args[1], args[0], options.local_store,
             options.remote_store)
 
+
 def cmd_rm(client, *args):
     parser = _make_command_parser('rm', "name")
     options, args = parser.parse_args(list(args))
@@ -75,6 +82,7 @@ def cmd_rm(client, *args):
         parser.error("Too many arguments")
     client.delete_file(args[0])
 
+
 def cmd_version(client, *args):
     parser = _make_command_parser('version', "name")
     options, args = parser.parse_args(list(args))
@@ -83,6 +91,7 @@ def cmd_version(client, *args):
     if len(args) > 1:
         parser.error("Too many arguments")
     print client.file_version(args[0])
+
 
 def main():
     usage = "usage: %prog [options] command [command-specific options]"

@@ -7,6 +7,7 @@ import email.utils
 import filetracker
 from filetracker.servers import base
 
+
 class LocalFileServer(base.Server):
     """A WSGI application providing a HTTP server compatible with
        :class:`filetracker.RemoteDataStore`."""
