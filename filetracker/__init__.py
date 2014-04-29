@@ -277,7 +277,7 @@ class DataStore(object):
         """
         raise NotImplementedError
 
-    def get_dir_listing(self):
+    def list_files(self):
         """Returns a list of all stored files, along with the dates of
            last modification.
         """
@@ -341,7 +341,7 @@ class LocalDataStore(DataStore):
         except OSError:
             pass
 
-    def get_dir_listing(self):
+    def list_files(self):
         result = []
         for root, dirs, files in os.walk(self.dir):
             for basename in files:
@@ -839,8 +839,8 @@ class Client(object):
         if self.remote_store:
             self.remote_store.delete_file(name)
 
-    def get_dir_listing(self):
+    def list_local_files(self):
         result = []
         if self.local_store:
-            result.extend(self.local_store.get_dir_listing())
+            result.extend(self.local_store.list_files())
         return result
