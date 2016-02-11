@@ -162,6 +162,14 @@ def _check_name(name, allow_version=True):
                          "in this API call")
 
 
+def _mkdir(name):
+    try:
+        os.makedirs(name, 0700)
+    except OSError, e:
+        if e.errno != errno.EEXIST:
+            raise
+
+
 def _report_timing(name):
     def decorator(fn):
         @functools.wraps(fn)
@@ -186,8 +194,8 @@ def _file_size(path):
 
 def _save_stream(path, stream, version=None):
     dir = os.path.dirname(path)
-    if dir and not os.path.exists(dir):
-        os.makedirs(dir)
+    if dir:
+        _mkdir(dir)
     if os.path.exists(path) and version is not None \
             and _file_version(path) >= version:
         return version
@@ -302,8 +310,7 @@ class LocalDataStore(DataStore):
 
     def __init__(self, dir):
         self.dir = os.path.join(dir, 'files')
-        if not os.path.exists(self.dir):
-            os.makedirs(self.dir, 0700)
+        _mkdir(self.dir)
 
     def _parse_name(self, name):
         _check_name(name)
@@ -547,22 +554,14 @@ class FcntlLockManager(LockManager):
 
     def __init__(self, dir):
         self.dir = dir
-        try:
-            os.makedirs(dir, 0700)
-        except OSError, e:
-            if e.errno != errno.EEXIST:
-                raise
+        _mkdir(dir)
 
     def lock_for(self, name):
         _check_name(name)
         name, version = split_name(name)
         path = self.dir + name
         dir = os.path.dirname(path)
-        try:
-            os.makedirs(dir, 0700)
-        except OSError, e:
-            if e.errno != errno.EEXIST:
-                raise
+        _mkdir(dir)
         return self.FcntlLock(path)
 
 
