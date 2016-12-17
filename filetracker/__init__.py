@@ -97,6 +97,7 @@
     - rm
 """
 
+import collections
 import errno
 import os
 import os.path
@@ -362,9 +363,14 @@ class LocalDataStore(DataStore):
         for root, dirs, files in os.walk(self.dir):
             for basename in files:
                 relative_dir = os.path.relpath(root, self.dir)
-                relative_basename = os.path.join(relative_dir, basename)
-                result.append((relative_basename, os.path.getmtime(
-                    os.path.join(root, basename))))
+                store_full_dir = '/' if relative_dir == '.' else '/' + relative_dir
+                store_full_basename = os.path.join(store_full_dir, basename)
+                full_path = os.path.join(root, basename)
+                file_stat = os.lstat(full_path)
+                result.append(Client.FileIndexEntry(name=store_full_basename,
+                                                    size=file_stat.st_size,
+                                                    mtime=file_stat.st_mtime,
+                                                    client=None))
         return result
 
 
@@ -612,14 +618,27 @@ class Client(object):
        :ref:`filetracker_api`).
     """
 
+    FileIndexEntry = collections.namedtuple('FileIndexEntry',
+                                            ['name', 'size', 'mtime', 'client'])
+    """Format of single entry in file index used by
+        :class:`filetracker.cachecleaner.CacheCleaner`.
+        * ``name`` unversioned name of given file
+        * ``size`` size of the file
+        * ``mtime`` modification time
+        * ``client`` reference to :class:`filetracker.Client` instance
+        which owns given file
+    """
+
+    DEFAULT_CACHE_DIR = os.path.expanduser(
+        os.path.join('~', '.filetracker-store'))
+
     def __init__(self, local_store='auto', remote_store='auto',
                  lock_manager='auto', cache_dir=None, remote_url=None,
                  locks_dir=None):
         if cache_dir is None:
             cache_dir = os.environ.get('FILETRACKER_DIR')
         if cache_dir is None:
-            cache_dir = os.path.expanduser(
-                    os.path.join('~', '.filetracker-store'))
+            cache_dir = self.DEFAULT_CACHE_DIR
         if remote_url is None:
             remote_url = os.environ.get('FILETRACKER_URL')
         if locks_dir is None:
@@ -856,5 +875,7 @@ class Client(object):
     def list_local_files(self):
         result = []
         if self.local_store:
-            result.extend(self.local_store.list_files())
+            for entry in self.local_store.list_files():
+                entry = entry._replace(client=self)
+                result.append(entry)
         return result
