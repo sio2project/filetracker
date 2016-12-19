@@ -78,6 +78,7 @@ class CacheCleaner(object):
         logger.info('Performing cache cleaning...')
         deleted_files_cnt = 0
         deleted_bytes = 0
+        assert self.file_index[0].mtime >= self.file_index[-1].mtime
         for fe in self.file_index[delete_from_index:]:
             logger.debug('Deleting file: %s from store located at: %s',
                          fe.name, fe.client.local_store.dir)
