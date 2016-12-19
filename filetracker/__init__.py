@@ -360,10 +360,11 @@ class LocalDataStore(DataStore):
 
     def list_files(self):
         result = []
-        for root, dirs, files in os.walk(self.dir):
+        for root, _dirs, files in os.walk(self.dir):
             for basename in files:
                 relative_dir = os.path.relpath(root, self.dir)
-                store_full_dir = '/' if relative_dir == '.' else '/' + relative_dir
+                store_full_dir = ('/' if relative_dir == '.'
+                                  else '/' + relative_dir)
                 store_full_basename = os.path.join(store_full_dir, basename)
                 full_path = os.path.join(root, basename)
                 file_stat = os.lstat(full_path)
@@ -618,8 +619,8 @@ class Client(object):
        :ref:`filetracker_api`).
     """
 
-    FileIndexEntry = collections.namedtuple('FileIndexEntry',
-                                            ['name', 'size', 'mtime', 'client'])
+    FileIndexEntry = collections.namedtuple(
+        'FileIndexEntry', ['name', 'size', 'mtime', 'client'])
     """Format of single entry in file index used by
         :class:`filetracker.cachecleaner.CacheCleaner`.
         * ``name`` unversioned name of given file

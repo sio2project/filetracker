@@ -1,9 +1,9 @@
-import collections
 import datetime
-import filetracker
 import logging
 from argparse import ArgumentParser
 import time
+
+import filetracker
 
 
 logger = logging.getLogger('ftcachecleanerd')
@@ -42,7 +42,7 @@ class CacheCleaner(object):
             if do_cleaning:
                 self._clean_cache(delete_from_index)
             sleeping_until_time = datetime.datetime.now() + self.scan_interval
-            logger.info('Sleeping until {}.'.format(sleeping_until_time))
+            logger.info('Sleeping until %s.', sleeping_until_time)
             time.sleep(self.scan_interval.total_seconds())
 
     def _scan_disk(self):
@@ -66,8 +66,8 @@ class CacheCleaner(object):
             if cache_size >= self.cache_size_limit:
                 do_cleaning = True
 
-        logger.info('Analysis done. Cache size: {}.'.format(
-            format_size_with_unit(cache_size)))
+        logger.info('Analysis done. Cache size: %s.',
+                    format_size_with_unit(cache_size))
         if not do_cleaning:
             logger.info('Decided not to perform cache cleaning.')
 
@@ -79,14 +79,14 @@ class CacheCleaner(object):
         deleted_files_cnt = 0
         deleted_bytes = 0
         for fe in self.file_index[delete_from_index:]:
-            logger.debug('Deleting file: {} from store located at: {}'
-                         .format(fe.name, fe.client.local_store.dir))
+            logger.debug('Deleting file: %s from store located at: %s',
+                         fe.name, fe.client.local_store.dir)
             fe.client.delete_file(fe.name)
             deleted_files_cnt += 1
             deleted_bytes += fe.size
         del self.file_index[delete_from_index:]
-        logger.info('Cleaning done. Deleted {} files, total {}.'.format(
-            deleted_files_cnt, format_size_with_unit(deleted_bytes)))
+        logger.info('Cleaning done. Deleted %d files, total %s.',
+                    deleted_files_cnt, format_size_with_unit(deleted_bytes))
 
 
 def main():
