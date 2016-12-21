@@ -19,7 +19,7 @@ setup(
         'console_scripts': [
             'filetracker = filetracker.shell:main',
             'filetracker-server = filetracker.servers.run:main',
-            'ftcachecleanerd = filetracker.cachecleaner:main',
+            'filetracker-cache-cleaner = filetracker.cachecleaner:main',
         ],
     }
 )
