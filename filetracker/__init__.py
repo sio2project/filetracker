@@ -61,6 +61,17 @@
 
    .. _filetracker_api:
 
+   -------------------------
+   Filetracker Cache Cleaner
+   -------------------------
+
+   For usage, please run::
+
+     $ filetracker-cache-cleaner --help
+
+   .. autoclass:: filetracker.cachecleaner.CacheCleaner
+       :members:
+
    ----------------------
    Internal API Reference
    ----------------------
@@ -221,6 +232,17 @@ class DataStore(object):
     """An abstract base class giving access to storing and retrieving files'
        content."""
 
+    FileInfoEntry = collections.namedtuple(
+        'FileInfoEntry', ['name', 'mtime', 'size'])
+    """Information entry for single file.
+
+        Fields:
+
+        * ``name`` unversioned name of given file
+        * ``mtime`` modification time
+        * ``size`` size of the file
+    """
+
     def add_stream(self, name, file):
         """Saves the passed stream in the store.
 
@@ -296,8 +318,7 @@ class DataStore(object):
         raise NotImplementedError
 
     def list_files(self):
-        """Returns a list of all stored files, along with the dates of
-           last modification.
+        """Returns a list of :class:`FileInfoEntry` for all stored files.
         """
         raise NotImplementedError
 
@@ -363,15 +384,15 @@ class LocalDataStore(DataStore):
         for root, _dirs, files in os.walk(self.dir):
             for basename in files:
                 relative_dir = os.path.relpath(root, self.dir)
-                store_full_dir = ('/' if relative_dir == '.'
-                                  else '/' + relative_dir)
-                store_full_basename = os.path.join(store_full_dir, basename)
-                full_path = os.path.join(root, basename)
-                file_stat = os.lstat(full_path)
-                result.append(Client.FileIndexEntry(name=store_full_basename,
-                                                    size=file_stat.st_size,
-                                                    mtime=file_stat.st_mtime,
-                                                    client=None))
+                store_dir = os.path.normpath(
+                    os.path.join('/', relative_dir))
+                name = os.path.join(store_dir, basename)
+                path, version = self._parse_name(name)
+                file_stat = os.lstat(path)
+                result.append(
+                    DataStore.FileInfoEntry(name=name,
+                                            mtime=file_stat.st_mtime,
+                                            size=file_stat.st_size))
         return result
 
 
@@ -619,17 +640,6 @@ class Client(object):
        :ref:`filetracker_api`).
     """
 
-    FileIndexEntry = collections.namedtuple(
-        'FileIndexEntry', ['name', 'size', 'mtime', 'client'])
-    """Format of single entry in file index used by
-        :class:`filetracker.cachecleaner.CacheCleaner`.
-        * ``name`` unversioned name of given file
-        * ``size`` size of the file
-        * ``mtime`` modification time
-        * ``client`` reference to :class:`filetracker.Client` instance
-        which owns given file
-    """
-
     DEFAULT_CACHE_DIR = os.path.expanduser(
         os.path.join('~', '.filetracker-store'))
 
@@ -642,8 +652,6 @@ class Client(object):
             cache_dir = self.DEFAULT_CACHE_DIR
         if remote_url is None:
             remote_url = os.environ.get('FILETRACKER_URL')
-        if locks_dir is None:
-            locks_dir = os.environ.get('FILETRACKER_LOCKS_DIR')
         if locks_dir is None and cache_dir:
             locks_dir = os.path.join(cache_dir, 'locks')
         if local_store == 'auto':
@@ -874,9 +882,12 @@ class Client(object):
             self.remote_store.delete_file(name)
 
     def list_local_files(self):
+        """Returns list of all stored local files.
+
+            Each element of this list is of :class:`DataStore.FileInfoEntry`
+            type.
+        """
         result = []
         if self.local_store:
-            for entry in self.local_store.list_files():
-                entry = entry._replace(client=self)
-                result.append(entry)
+            result.extend(self.local_store.list_files())
         return result
