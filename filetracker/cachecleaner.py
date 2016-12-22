@@ -1,7 +1,8 @@
+from argparse import ArgumentParser
 import collections
 import datetime
+import glob
 import logging
-from argparse import ArgumentParser
 import time
 
 import filetracker
@@ -19,8 +20,8 @@ class CacheCleaner(object):
        as constructors parameters:
 
        :param int cache_size_limit: soft limit for sum of logical files size
-       :param iterable cache_dirs: list of paths to
-           :class:`filetracker.Client` cache directories
+       :param iterable glob_cache_dirs: list of paths to
+           :class:`filetracker.Client` cache directories as glob expressions
        :param datetime.timedelta scan_interval: interval specifying how often
            scan the disk and optionally clean cache
        :param float percent_cleaning_level: how many percent of
@@ -57,11 +58,12 @@ class CacheCleaner(object):
             file
     """
 
-    def __init__(self, cache_size_limit, cache_dirs=None,
+    def __init__(self, cache_size_limit, glob_cache_dirs,
                  scan_interval=datetime.timedelta(minutes=10),
                  percent_cleaning_level=50.0):
-        self.clients = [filetracker.Client(cache_dir=dir, remote_store=None)
-                        for dir in cache_dirs or (None,)]
+        assert glob_cache_dirs
+        self.glob_cache_dirs = glob_cache_dirs
+        self.clients = []
         self.file_index = []
         self.scan_interval = scan_interval
         self.cache_size_limit = cache_size_limit
@@ -82,6 +84,12 @@ class CacheCleaner(object):
 
     def _scan_disk(self):
         logger.info("Scanning disk...")
+        dirs = []
+        for glob_cache_dir in self.glob_cache_dirs:
+            dirs.extend(glob.glob(glob_cache_dir))
+        logger.debug("Glob expressions have expanded to %s", dirs)
+        self.clients = [filetracker.Client(cache_dir=dir, remote_store=None)
+                        for dir in dirs]
         self.file_index = []
         for client in self.clients:
             for file_info in client.list_local_files():
@@ -134,11 +142,12 @@ def main():
     usage = "usage: %(prog)s [options]"
     parser = ArgumentParser(usage=usage)
 
-    parser.add_argument('-c', '--cache-dirs', dest='cache_dirs', nargs='+',
+    parser.add_argument('-c', '--cache-dirs', dest='glob_cache_dirs',
+                        nargs='+',
                         default=[filetracker.Client.DEFAULT_CACHE_DIR],
-                        help="Paths to the local cache directories. If not "
-                        "specified, uses default File Tracker directory: "
-                        "%(default)s")
+                        help="Paths to the local cache directories specified "
+                        "as glob expressions. If not specified, uses default "
+                        "File Tracker directory: %(default)s")
     parser.add_argument('-s', '--cache-size-limit', dest='cache_size_limit',
                         help="Soft limit for cache. Must be used with the "
                         "following units: B, K, M, G, T and can be chained. "
@@ -183,7 +192,7 @@ def main():
 
     daemon = CacheCleaner(
         cache_size_limit=cache_size_limit,
-        cache_dirs=args.cache_dirs,
+        glob_cache_dirs=args.glob_cache_dirs,
         scan_interval=scan_interval,
         percent_cleaning_level=args.percent_cleaning_level)
     daemon.run()
