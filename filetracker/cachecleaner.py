@@ -74,10 +74,13 @@ class CacheCleaner(object):
         """
         logger.info("Starting daemon.")
         while True:
-            self._scan_disk()
-            do_cleaning, delete_from_index = self._analyze_file_index()
-            if do_cleaning:
-                self._clean_cache(delete_from_index)
+            try:
+                self._scan_disk()
+                do_cleaning, delete_from_index = self._analyze_file_index()
+                if do_cleaning:
+                    self._clean_cache(delete_from_index)
+            except Exception:
+                logger.exception("Following exception occurred:")
             sleeping_until_time = datetime.datetime.now() + self.scan_interval
             logger.info("Sleeping until %s.", sleeping_until_time)
             time.sleep(self.scan_interval.total_seconds())
@@ -130,9 +133,12 @@ class CacheCleaner(object):
         for entry in self.file_index[delete_from_index:]:
             logger.debug("Deleting file: %s from store located at: %s",
                          entry.file_info.name, entry.client.local_store.dir)
-            entry.client.delete_file(entry.file_info.name)
-            deleted_files_cnt += 1
-            deleted_bytes += entry.file_info.size
+            try:
+                entry.client.delete_file(entry.file_info.name)
+                deleted_files_cnt += 1
+                deleted_bytes += entry.file_info.size
+            except Exception as e:
+                logger.debug(e, exc_info=True)
         del self.file_index[delete_from_index:]
         logger.info("Cleaning done. Deleted %d files, total %s.",
                     deleted_files_cnt, format_size_with_unit(deleted_bytes))
