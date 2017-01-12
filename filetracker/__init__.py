@@ -238,7 +238,7 @@ class DataStore(object):
 
         Fields:
 
-        * ``name`` unversioned name of given file
+        * ``name`` versioned name of given file
         * ``mtime`` modification time
         * ``size`` size of the file
     """
@@ -389,8 +389,9 @@ class LocalDataStore(DataStore):
                 name = os.path.join(store_dir, basename)
                 path, version = self._parse_name(name)
                 file_stat = os.lstat(path)
+                vname = versioned_name(name, self.file_version(name))
                 result.append(
-                    DataStore.FileInfoEntry(name=name,
+                    DataStore.FileInfoEntry(name=vname,
                                             mtime=file_stat.st_mtime,
                                             size=file_stat.st_size))
         return result
