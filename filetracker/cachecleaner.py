@@ -138,7 +138,9 @@ class CacheCleaner(object):
                 deleted_files_cnt += 1
                 deleted_bytes += entry.file_info.size
             except Exception as e:
-                logger.debug(e, exc_info=True)
+                logger.warning('During deleting file %s occurred following '
+                               'exception: %s', entry.file_info.name, e,
+                               exc_info=True)
         del self.file_index[delete_from_index:]
         logger.info("Cleaning done. Deleted %d files, total %s.",
                     deleted_files_cnt, format_size_with_unit(deleted_bytes))
