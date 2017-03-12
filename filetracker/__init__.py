@@ -516,7 +516,7 @@ class RemoteDataStore(DataStore):
 class LockManager(object):
     """An abstract class representing a lock manager.
 
-       Lock manager is basically a factory of :class:`FileLock` instances.
+       Lock manager is basically a factory of :class:`LockManager.Lock` instances.
     """
 
     class Lock(object):
@@ -542,7 +542,7 @@ class LockManager(object):
             pass
 
     def lock_for(self, name):
-        """Returns a :class:`FileLock` bound to the passed file.
+        """Returns a :class:`LockManager.Lock` bound to the passed file.
 
            Locks are not versioned -- there should be a single lock for
            all versions of the given name. The argument ``name`` may contain
