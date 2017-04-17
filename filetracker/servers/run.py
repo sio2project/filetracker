@@ -87,10 +87,13 @@ def main(args=None):
             tempdir=tempfile.gettempdir())
 
     if options.log:
+        # stderr is a special logging parameter for lighttpd
+        if options.log != 'stderr':
+            options.log = os.path.abspath(options.log)
         LIGHTHTTPD_CONF += """
                 server.modules += ( "mod_accesslog" )
                 accesslog.filename = "%(log)s"
-            """ % dict(log=os.path.abspath(options.log))
+            """ % dict(log=options.log)
 
     conf_fd, conf_path = tempfile.mkstemp(text=True)
     try:
