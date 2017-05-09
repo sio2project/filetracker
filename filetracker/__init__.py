@@ -503,7 +503,7 @@ class RemoteDataStore(DataStore):
         url, version = self._parse_name(filename)
         request = urllib2.Request(url)
         if version is not None:
-            request.add_header('Last-Modified', email.util.formatdate(version))
+            request.add_header('Last-Modified', email.utils.formatdate(version))
         request.get_method = lambda: 'DELETE'
         try:
             urllib2.urlopen(request)
@@ -717,6 +717,8 @@ class Client(object):
                 lock.lock_exclusive()
             else:
                 lock.lock_shared()
+        else:
+            add_to_cache = False
 
         t = time.time()
         logger.debug('    downloading %s', name)
@@ -724,7 +726,7 @@ class Client(object):
             if not self.remote_store or (version is not None
                                          and not force_refresh):
                 try:
-                    if self.local_store.exists(name):
+                    if self.local_store and self.local_store.exists(name):
                         return self.local_store.get_file(name, save_to)
                 except Exception:
                     if self.remote_store:
@@ -734,7 +736,8 @@ class Client(object):
                         raise
             if self.remote_store:
                 if not _lock_exclusive and add_to_cache:
-                    lock.unlock()
+                    if lock:
+                        lock.unlock()
                     return self.get_file(name, save_to, add_to_cache,
                                          _lock_exclusive=True)
                 vname = self.remote_store.get_file(name, save_to)
@@ -768,7 +771,7 @@ class Client(object):
             if not self.remote_store or (version is not None
                                          and not force_refresh):
                 try:
-                    if self.local_store.exists(name):
+                    if self.local_store and self.local_store.exists(name):
                         return self.local_store.get_stream(name)
                 except Exception:
                     if self.remote_store:
@@ -813,7 +816,7 @@ class Client(object):
             if not self.remote_store or (version is not None
                                          and not force_refresh):
                 try:
-                    if self.local_store.exists(name):
+                    if self.local_store and self.local_store.exists(name):
                         return self.local_store.file_size(name)
                 except Exception:
                     if self.remote_store:
