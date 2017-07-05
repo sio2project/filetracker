@@ -342,7 +342,8 @@ class LocalDataStore(DataStore):
 
     def add_stream(self, name, stream):
         path, version = self._parse_name(name)
-        return versioned_name(name, _save_stream(path, stream, version))
+        return versioned_name(
+                split_name(name)[0], _save_stream(path, stream, version))
 
     def get_stream(self, name):
         path, version = self._parse_name(name)
@@ -750,14 +751,16 @@ class Client(object):
                 lock.close()
             logger.debug('    processed %s in %.2fs', name, time.time() - t)
 
-    def get_stream(self, name, force_refresh=False):
+    def get_stream(self, name, force_refresh=False, serve_from_cache=False):
         """Retrieves file identified by ``name`` in streaming mode.
 
            Works like :meth:`get_file`, except that returns a tuple
            (file-like object, versioned name).
 
-           Does not support adding to cache, although the file will be served
-           locally if a full version is specified and exists in the cache.
+           When both remote_store and local_store are present, serve_from_cache
+           can be used to ensure that the file will be downloaded and served
+           from a local cache. If a full version is specified and the file
+           exists in the cache a file will be always served locally.
         """
 
         uname, version = split_name(name)
@@ -780,6 +783,15 @@ class Client(object):
                     else:
                         raise
             if self.remote_store:
+                if self.local_store and serve_from_cache:
+                    if version is None:
+                        version = self.remote_store.file_version(name)
+                        if version:
+                            name = versioned_name(uname, version)
+                    if force_refresh or not self.local_store.exists(name):
+                        (stream, vname) = self.remote_store.get_stream(name)
+                        name = self.local_store.add_stream(vname, stream)
+                    return self.local_store.get_stream(name)
                 return self.remote_store.get_stream(name)
             raise FiletrackerError("File not available: %s" % name)
         finally:
