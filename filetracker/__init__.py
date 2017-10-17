@@ -497,7 +497,7 @@ class RemoteDataStore(DataStore):
         request = urllib2.Request(url)
         request.get_method = lambda: 'HEAD'
         response = urllib2.urlopen(request)
-        return int(response.info().get('content-length'))
+        return int(response.info().get('content-length', 0))
 
     @_verbose_http_errors
     def delete_file(self, filename):
