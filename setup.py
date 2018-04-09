@@ -11,8 +11,9 @@ setup(
     packages = find_packages(),
 
     install_requires = [
-        'poster >= 0.7',
-        'flup',
+        'six',
+        'requests',
+        'flup6',
     ],
 
     entry_points = {
