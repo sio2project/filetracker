@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+from __future__ import print_function
 from optparse import OptionParser
 import os, os.path
 import sys
@@ -69,8 +71,8 @@ def cmd_put(client, *args):
         parser.error("Missing Filetracker filename")
     if len(args) > 2:
         parser.error("Too many arguments")
-    print client.put_file(args[1], args[0], options.local_store,
-            options.remote_store)
+    print(client.put_file(args[1], args[0], options.local_store,
+            options.remote_store))
 
 
 def cmd_rm(client, *args):
@@ -90,13 +92,13 @@ def cmd_version(client, *args):
         parser.error("Missing Filetracker filename")
     if len(args) > 1:
         parser.error("Too many arguments")
-    print client.file_version(args[0])
+    print(client.file_version(args[0]))
 
 
 def main():
     usage = "usage: %prog [options] command [command-specific options]"
-    commands = filter(lambda s: s.startswith('cmd_'), globals())
-    commands = sorted(map(lambda s: s[4:], commands))
+    commands = [s for s in globals() if s.startswith('cmd_')]
+    commands = sorted([s[4:] for s in commands])
     epilog = """
 Options specified above are filled from environment
 (FILETRACKER_DIR, FILETRACKER_URL, FILETRACKER_PUBLIC_URL)

@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+from __future__ import print_function
 import socket
 import errno
 import os
@@ -13,7 +15,7 @@ class Server(object):
         try:
             return getattr(self, 'handle_' + environ['REQUEST_METHOD']) \
                     (environ, start_response)
-        except Exception, e:
+        except Exception as e:
             status = '500 Oops'
             response_headers = [
                     ('Content-Type', 'text/plain'),
@@ -38,7 +40,7 @@ def start_fcgi(server):
 def start_standalone(server, port=8000):
     from wsgiref.simple_server import make_server
     httpd = make_server('', port, server)
-    print "Serving on port %d..." % port
+    print("Serving on port %d..." % port)
     httpd.serve_forever()
 
 
@@ -52,7 +54,7 @@ def main(server):
     stdin_sock = socket.fromfd(0, socket.AF_UNIX, socket.SOCK_STREAM)
     try:
         stdin_sock.getpeername()
-    except socket.error, e:
+    except socket.error as e:
         if e[0] == errno.ENOTCONN:
             start_fcgi(server)
 

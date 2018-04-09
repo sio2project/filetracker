@@ -108,6 +108,7 @@
     - rm
 """
 
+from __future__ import absolute_import
 import collections
 import errno
 import os
@@ -120,11 +121,12 @@ import email.utils
 import fcntl
 import time
 from six.moves.urllib.request import pathname2url
+import six
 
 logger = logging.getLogger('filetracker')
 
 
-class FiletrackerError(StandardError):
+class FiletrackerError(Exception):
     pass
 
 
@@ -154,7 +156,7 @@ def versioned_name(unversioned_name, version):
 
 
 def _check_name(name, allow_version=True):
-    if not isinstance(name, basestring):
+    if not isinstance(name, six.string_types):
         raise ValueError("Invalid Filetracker filename: not string: %r" %
                         (name,))
     parts = name.split('/')
@@ -175,8 +177,8 @@ def _check_name(name, allow_version=True):
 
 def _mkdir(name):
     try:
-        os.makedirs(name, 0700)
-    except OSError, e:
+        os.makedirs(name, 0o700)
+    except OSError as e:
         if e.errno != errno.EEXIST:
             raise
 
@@ -405,7 +407,7 @@ def _verbose_http_errors(fn):
     def wrapped(*args, **kwargs):
         try:
             return fn(*args, **kwargs)
-        except requests.exceptions.RequestException, e:
+        except requests.exceptions.RequestException as e:
             if e.response is None:
                 raise FiletrackerError('Error making HTTP request: %s' % e)
 
@@ -573,7 +575,7 @@ class FcntlLockManager(LockManager):
 
     class FcntlLock(LockManager.Lock):
         def __init__(self, filename):
-            self.fd = os.open(filename, os.O_WRONLY | os.O_CREAT, 0600)
+            self.fd = os.open(filename, os.O_WRONLY | os.O_CREAT, 0o600)
 
             # Set mtime so that any future cleanup script may remove lock files
             # not used for some specified time.
