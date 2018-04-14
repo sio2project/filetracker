@@ -380,7 +380,10 @@ class LocalDataStore(DataStore):
             if version is not None and _file_version(path) != version:
                 return
             os.remove(path)
-            os.removedirs(os.path.dirname(path))
+
+            dir_path = os.path.dirname(path)
+            if dir_path != self.dir:
+                os.removedirs(dir_path)
         except OSError:
             pass
 
