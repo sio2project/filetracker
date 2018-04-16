@@ -46,16 +46,16 @@ class InteractionTest(unittest.TestCase):
         self.client = InteractionTest.client
 
     def test_put_file_should_save_file_both_locally_and_remotely(self):
-        temp_file = os.path.join(self.temp_dir, 'foo.txt')
+        temp_file = os.path.join(self.temp_dir, 'put.txt')
         with open(temp_file, 'w') as tf:
             tf.write('hello')
 
-        self.client.put_file('/foo', temp_file)
+        self.client.put_file('/put.txt', temp_file)
 
         # The remote path looks strange, but with lighttpd one 'files' is
         # stripped away (apparently).
-        cache_path = os.path.join(self.cache_dir, 'files', 'foo')
-        remote_path = os.path.join(self.server_dir, 'files', 'files', 'foo')
+        cache_path = os.path.join(self.cache_dir, 'files', 'put.txt')
+        remote_path = os.path.join(self.server_dir, 'files', 'files', 'put.txt')
 
         self.assertTrue(os.path.exists(cache_path))
         self.assertTrue(os.path.exists(remote_path))
@@ -67,21 +67,21 @@ class InteractionTest(unittest.TestCase):
             self.assertEqual(rf.read(), 'hello')
 
     def test_get_file_should_raise_error_if_file_doesnt_exist(self):
-        temp_file = os.path.join(self.temp_dir, 'foo.txt')
+        temp_file = os.path.join(self.temp_dir, 'get_doesnt_exist.txt')
         
         with self.assertRaises(filetracker.FiletrackerError):
-            self.client.get_file('/doesnt.exist', temp_file)
+            self.client.get_file('/doesnt_exist', temp_file)
 
     def test_get_file_should_save_file_contents_to_destination(self):
-        src_file = os.path.join(self.temp_dir, 'src.txt')
-        dest_file = os.path.join(self.temp_dir, 'dest.txt')
+        src_file = os.path.join(self.temp_dir, 'get_src.txt')
+        dest_file = os.path.join(self.temp_dir, 'get_dest.txt')
 
         with open(src_file, 'w') as sf:
             sf.write('hello')
 
-        self.client.put_file('/foo.txt', src_file)
+        self.client.put_file('/get.txt', src_file)
 
-        self.client.get_file('/foo.txt', dest_file)
+        self.client.get_file('/get.txt', dest_file)
 
         with open(dest_file, 'r') as df:
             self.assertEqual(df.read(), 'hello')
