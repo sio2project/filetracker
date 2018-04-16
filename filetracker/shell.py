@@ -51,7 +51,7 @@ def cmd_cat(client, *args):
         out_filename = os.path.join(tmpdir, 'out')
         args = args + (out_filename,)
         cmd_get(client, *args)
-        shutil.copyfileobj(open(out_filename, 'rb'), sys.stdout)
+        shutil.copyfileobj(open(out_filename, 'r'), sys.stdout)
     finally:
         shutil.rmtree(tmpdir)
 

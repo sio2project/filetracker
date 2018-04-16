@@ -55,7 +55,7 @@ def main(server):
     try:
         stdin_sock.getpeername()
     except socket.error as e:
-        if e[0] == errno.ENOTCONN:
+        if e.errno == errno.ENOTCONN:
             start_fcgi(server)
 
     start_standalone(server)
