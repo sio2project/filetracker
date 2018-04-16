@@ -415,7 +415,7 @@ def _verbose_http_errors(fn):
                 raise FiletrackerError('Error making HTTP request: %s' % e)
 
             code = e.response.status_code
-            message = e.response.headers.get('x-exception', e.text)
+            message = e.response.headers.get('x-exception', str(e))
             raise FiletrackerError('HTTP/%d: %s' % (code, message))
 
     return wrapped
@@ -466,8 +466,6 @@ class RemoteDataStore(DataStore):
         name, version = split_name(name)
         return versioned_name(name, self._parse_last_modified(response))
 
-    # This should probably be deprecated in favor of using get_file
-    # directly, see http://docs.python-requests.org/en/master/user/quickstart/#raw-response-content
     @_verbose_http_errors
     def get_stream(self, name):
         url, version = self._parse_name(name)
@@ -482,6 +480,7 @@ class RemoteDataStore(DataStore):
         name, version = split_name(name)
         return response.raw, versioned_name(name, remote_version)
 
+    @_verbose_http_errors
     def get_file(self, name, filename):
         url, version = self._parse_name(name)
         response = requests.get(url, stream=True)
@@ -530,9 +529,9 @@ class RemoteDataStore(DataStore):
     @_verbose_http_errors
     def delete_file(self, filename):
         url, version = self._parse_name(filename)
-        requests.delete(url, headers={
+        response = requests.delete(url, headers={
             'Last-Modified': email.utils.formatdate(version)})
-        requests.raise_for_status()
+        response.raise_for_status()
 
 
 class LockManager(object):
@@ -903,6 +902,8 @@ class Client(object):
 
         return versioned_name
 
+    # This is a very cool method except our server doesn't support DELETE
+    # requests.
     def delete_file(self, name):
         """Deletes the file identified by ``name`` along with its metadata.
 
