@@ -906,7 +906,7 @@ class Client(object):
         return versioned_name
 
     # This is a very cool method except our server doesn't support DELETE
-    # requests.
+    # requests. (SIO-2093)
     def delete_file(self, name):
         """Deletes the file identified by ``name`` along with its metadata.
 
