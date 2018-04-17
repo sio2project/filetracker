@@ -290,9 +290,9 @@ class DataStore(object):
         raise NotImplementedError
 
     def get_stream(self, name):
-        """Retrieves a file in streaming mode.
+        """Retrieves a file as a binary stream.
 
-           Returns a pair (file-like object, versioned name).
+           Returns a pair (binary stream, versioned name).
         """
         raise NotImplementedError
 
@@ -304,7 +304,10 @@ class DataStore(object):
 
            Returns the full versioned name of the retrieved file.
         """
-        raise NotImplementedError
+        stream, vname = self.get_stream(name)
+        path, version = split_name(vname)
+        _save_stream(filename, stream, version)
+        return vname
 
     def delete_file(self, name):
         """Deletes the file under the name ``name`` and the metadata
@@ -348,12 +351,6 @@ class LocalDataStore(DataStore):
         if not os.path.exists(path):
             raise FiletrackerError("File not found: " + path)
         return open(path, 'rb'), versioned_name(name, _file_version(path))
-
-    def get_file(self, name, filename):
-        stream, vname = self.get_stream(name)
-        path, version = split_name(vname)
-        _save_stream(filename, stream, version)
-        return vname
 
     def exists(self, name):
         path, version = self._parse_name(name)
@@ -482,25 +479,6 @@ class RemoteDataStore(DataStore):
                     % (name, remote_version))
         name, version = split_name(name)
         return response.raw, versioned_name(name, remote_version)
-
-    @_verbose_http_errors
-    def get_file(self, name, filename):
-        url, version = self._parse_name(name)
-        response = requests.get(url, stream=True)
-        response.raise_for_status()
-
-        remote_version = self._parse_last_modified(response)
-        if version is not None and remote_version is not None \
-                and version != remote_version:
-            raise FiletrackerError("Version %s not available. Server has %s" \
-                    % (name, remote_version))
-        name, _version = split_name(name)
-
-        with open(filename, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=4096):
-                f.write(chunk)
-
-        return versioned_name(name, remote_version)
 
     def exists(self, name):
         url, version = self._parse_name(name)
