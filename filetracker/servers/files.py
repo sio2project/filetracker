@@ -94,6 +94,12 @@ class LocalFileServer(base.Server):
         start_response('200 OK', self._file_headers(path))
         return []
 
+    def handle_DELETE(self, environ, start_response):
+        # SIO-2093
+        path = self.dir + self._get_path(environ)
+        start_response('200 OK', self._file_headers(path))
+        return []
+
 
 _BUFFER_SIZE = 64 * 1024
 
