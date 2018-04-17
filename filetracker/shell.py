@@ -10,6 +10,9 @@ import tempfile
 from filetracker import Client
 
 
+_BUFFER_SIZE = 64 * 1024
+
+
 def _make_command_parser(cmd, extra_usage=''):
     usage = "usage: %prog [options] command [command-specific options] " \
             + extra_usage
@@ -51,7 +54,13 @@ def cmd_cat(client, *args):
         out_filename = os.path.join(tmpdir, 'out')
         args = args + (out_filename,)
         cmd_get(client, *args)
-        shutil.copyfileobj(open(out_filename, 'r'), sys.stdout)
+
+        # We do this manually since there is no other py2/py3 portable way.
+        with open(out_filename, 'rb') as tf:
+            buf = tf.read(_BUFFER_SIZE)
+            while buf:
+                os.write(1, buf)
+                buf = tf.read(_BUFFER_SIZE)
     finally:
         shutil.rmtree(tmpdir)
 
