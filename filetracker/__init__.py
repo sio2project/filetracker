@@ -458,6 +458,9 @@ class RemoteDataStore(DataStore):
     @_verbose_http_errors
     def add_file(self, name, filename):
         url, version = self._parse_name(name)
+
+        # Important detail: this upload is streaming.
+        # http://docs.python-requests.org/en/latest/user/advanced/#streaming-uploads
         with open(filename, 'rb') as f:
             headers = {'Last-Modified': email.utils.formatdate(version)}
             response = requests.put(url, data=f, headers=headers)
