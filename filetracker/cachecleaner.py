@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from argparse import ArgumentParser
 import collections
 import datetime
@@ -244,7 +245,7 @@ def parse_units(text, units):
 
 
 def format_with_unit(number, size_units):
-    units = sorted(size_units.items(), key=lambda x: -x[1])
+    units = sorted(list(size_units.items()), key=lambda x: -x[1])
     for unit, size in units:
         if number >= size:
             return "{amount:.3f}{unit}".format(amount=float(number) / size,

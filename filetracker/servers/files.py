@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from __future__ import absolute_import
 import os.path
 import shutil
 import email.utils
@@ -33,6 +34,8 @@ class LocalFileServer(base.Server):
         if not os.path.exists(dirname):
             os.makedirs(dirname)
 
+        content_length = int(environ.get('CONTENT_LENGTH'))
+
         last_modified = environ.get('HTTP_LAST_MODIFIED')
         if last_modified:
             last_modified = email.utils.parsedate_tz(last_modified)
@@ -40,9 +43,9 @@ class LocalFileServer(base.Server):
 
         if not last_modified or not os.path.exists(path) \
                 or os.stat(path).st_mtime < last_modified:
-            f = open(path, 'wb')
-            shutil.copyfileobj(environ['wsgi.input'], f)
-            f.close()
+            with open(path, 'wb') as f:
+                _copy_stream(environ['wsgi.input'], f, content_length)
+
             if last_modified:
                 os.utime(path, (last_modified, last_modified))
 
@@ -51,7 +54,7 @@ class LocalFileServer(base.Server):
                 ('Content-Type', 'text/plain'),
                 ('Last-Modified', email.utils.formatdate(st.st_mtime)),
             ])
-        return ['OK']
+        return [b'OK']
 
     @staticmethod
     def _fileobj_iterator(fileobj, bufsize=65536):
@@ -90,6 +93,27 @@ class LocalFileServer(base.Server):
             return ['File not found: %s' % path]
         start_response('200 OK', self._file_headers(path))
         return []
+
+
+_BUFFER_SIZE = 64 * 1024
+
+
+def _copy_stream(src, dest, length):
+    """Similar to shutil.copyfileobj, but supports limiting data size.
+
+    As for why this is required, refer to
+    https://www.python.org/dev/peps/pep-0333/#input-and-error-streams
+
+    Yes, there are WSGI implementations which do not support EOFs, and
+    believe me, you don't want to debug this.
+    """
+    bytes_left = length
+    while bytes_left > 0:
+        buf_size = min(_BUFFER_SIZE, bytes_left)
+        buf = src.read(buf_size)
+        dest.write(buf)
+        bytes_left -= buf_size
+
 
 if __name__ == '__main__':
     base.main(LocalFileServer())

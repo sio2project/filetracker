@@ -1,4 +1,5 @@
-from cStringIO import StringIO
+from __future__ import absolute_import
+from six import StringIO
 from collections import defaultdict
 import time
 
@@ -52,13 +53,13 @@ class DummyDataStore(DataStore):
     def file_version(self, name):
         key, version = self._parse_name(name)
         if key not in self.versions:
-            raise KeyError, key
+            raise KeyError(key)
         return self.versions[key]
 
     def file_size(self, name):
         key, version = self._parse_name(name)
         if key not in self.data:
-            raise KeyError, key
+            raise KeyError(key)
         if version is not None and self.versions[key] != version:
             raise KeyError("Version %s of %s not found" % (version, key))
         return len(self.data[key])

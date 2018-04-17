@@ -2,6 +2,7 @@
 
 """A script for starting filetracker server using lighttpd."""
 
+from __future__ import absolute_import
 import os
 import os.path
 import sys
@@ -48,7 +49,7 @@ def main(args=None):
 
     docroot = os.path.abspath(options.dir)
     if not os.path.exists(docroot):
-        os.makedirs(docroot, 0700)
+        os.makedirs(docroot, 0o700)
 
     LIGHTHTTPD_CONF = """
             server.tag = "filetracker"
@@ -118,7 +119,7 @@ def main(args=None):
 
         try:
             popen = subprocess.Popen(args, env=env)
-        except OSError, e:
+        except OSError as e:
             raise RuntimeError("Cannot run lighttpd:\n%s" % e)
 
         signal.signal(signal.SIGINT, lambda signum, frame: popen.terminate())

@@ -108,6 +108,7 @@
     - rm
 """
 
+from __future__ import absolute_import
 import collections
 import errno
 import os
@@ -115,17 +116,17 @@ import os.path
 import shutil
 import functools
 import logging
-import urllib
-import urllib2
+import requests
 import email.utils
-import poster.streaminghttp
 import fcntl
 import time
+from six.moves.urllib.request import pathname2url
+import six
 
 logger = logging.getLogger('filetracker')
 
 
-class FiletrackerError(StandardError):
+class FiletrackerError(Exception):
     pass
 
 
@@ -155,7 +156,7 @@ def versioned_name(unversioned_name, version):
 
 
 def _check_name(name, allow_version=True):
-    if not isinstance(name, basestring):
+    if not isinstance(name, six.string_types):
         raise ValueError("Invalid Filetracker filename: not string: %r" %
                         (name,))
     parts = name.split('/')
@@ -176,8 +177,8 @@ def _check_name(name, allow_version=True):
 
 def _mkdir(name):
     try:
-        os.makedirs(name, 0700)
-    except OSError, e:
+        os.makedirs(name, 0o700)
+    except OSError as e:
         if e.errno != errno.EEXIST:
             raise
 
@@ -303,10 +304,7 @@ class DataStore(object):
 
            Returns the full versioned name of the retrieved file.
         """
-        stream, vname = self.get_stream(name)
-        path, version = split_name(vname)
-        _save_stream(filename, stream, version)
-        return vname
+        raise NotImplementedError
 
     def delete_file(self, name):
         """Deletes the file under the name ``name`` and the metadata
@@ -351,6 +349,12 @@ class LocalDataStore(DataStore):
             raise FiletrackerError("File not found: " + path)
         return open(path, 'rb'), versioned_name(name, _file_version(path))
 
+    def get_file(self, name, filename):
+        stream, vname = self.get_stream(name)
+        path, version = split_name(vname)
+        _save_stream(filename, stream, version)
+        return vname
+
     def exists(self, name):
         path, version = self._parse_name(name)
         if not os.path.exists(path):
@@ -376,7 +380,10 @@ class LocalDataStore(DataStore):
             if version is not None and _file_version(path) != version:
                 return
             os.remove(path)
-            os.removedirs(os.path.dirname(path))
+
+            dir_path = os.path.dirname(path)
+            if dir_path != self.dir:
+                os.removedirs(dir_path)
         except OSError:
             pass
 
@@ -403,9 +410,14 @@ def _verbose_http_errors(fn):
     def wrapped(*args, **kwargs):
         try:
             return fn(*args, **kwargs)
-        except urllib2.HTTPError, e:
-            message = e.info().get('x-exception') or e.read()
-            raise FiletrackerError("HTTP/%d: %s" % (e.code, message))
+        except requests.exceptions.RequestException as e:
+            if e.response is None:
+                raise FiletrackerError('Error making HTTP request: %s' % e)
+
+            code = e.response.status_code
+            message = e.response.headers.get('x-exception', str(e))
+            raise FiletrackerError('HTTP/%d: %s' % (code, message))
+
     return wrapped
 
 
@@ -428,11 +440,11 @@ class RemoteDataStore(DataStore):
     def _parse_name(self, name):
         _check_name(name)
         name, version = split_name(name)
-        url = self.base_url + urllib.pathname2url(name)
+        url = self.base_url + pathname2url(name)
         return url, version
 
     def _parse_last_modified(self, response):
-        last_modified = response.info().get('last-modified')
+        last_modified = response.headers.get('last-modified')
         if last_modified:
             last_modified = email.utils.parsedate_tz(last_modified)
             last_modified = int(email.utils.mktime_tz(last_modified))
@@ -446,72 +458,83 @@ class RemoteDataStore(DataStore):
     @_verbose_http_errors
     def add_file(self, name, filename):
         url, version = self._parse_name(name)
-        size = os.path.getsize(filename)
-        req = urllib2.Request(url, open(filename, 'rb'),
-                {'Content-Type': 'application/octet-stream',
-                 'Content-Length': str(size),
-                 'Last-Modified': email.utils.formatdate(version)})
-        req.get_method = lambda: 'PUT'
-        opener = urllib2.build_opener(
-            poster.streaminghttp.StreamingHTTPHandler)
-        response = opener.open(req)
+
+        # Important detail: this upload is streaming.
+        # http://docs.python-requests.org/en/latest/user/advanced/#streaming-uploads
+        with open(filename, 'rb') as f:
+            headers = {'Last-Modified': email.utils.formatdate(version)}
+            response = requests.put(url, data=f, headers=headers)
+            response.raise_for_status()
+
         name, version = split_name(name)
         return versioned_name(name, self._parse_last_modified(response))
 
     @_verbose_http_errors
     def get_stream(self, name):
         url, version = self._parse_name(name)
-        response = urllib2.urlopen(url)
+        response = requests.get(url, stream=True)
+        response.raise_for_status()
+
         remote_version = self._parse_last_modified(response)
         if version is not None and remote_version is not None \
                 and version != remote_version:
             raise FiletrackerError("Version %s not available. Server has %s" \
                     % (name, remote_version))
         name, version = split_name(name)
-        return response, versioned_name(name, remote_version)
+        return response.raw, versioned_name(name, remote_version)
+
+    @_verbose_http_errors
+    def get_file(self, name, filename):
+        url, version = self._parse_name(name)
+        response = requests.get(url, stream=True)
+        response.raise_for_status()
+
+        remote_version = self._parse_last_modified(response)
+        if version is not None and remote_version is not None \
+                and version != remote_version:
+            raise FiletrackerError("Version %s not available. Server has %s" \
+                    % (name, remote_version))
+        name, _version = split_name(name)
+
+        with open(filename, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=4096):
+                f.write(chunk)
+
+        return versioned_name(name, remote_version)
 
     def exists(self, name):
         url, version = self._parse_name(name)
-        try:
-            remote_version = self.file_version(name)
-            if version is not None and remote_version is not None \
-                    and version != remote_version:
-                return False
-            return True
-        except urllib2.HTTPError, r:
-            if r.code == 404:
-                return False
-            raise
+        response = requests.head(url)
+        if response.status_code == 404:
+            return False
+
+        remote_version = self._parse_last_modified(response)
+        if (version is not None
+                and remote_version is not None
+                and version != remote_version):
+                    return False
+        return True
 
     @_verbose_http_errors
     def file_version(self, name):
         url, version = self._parse_name(name)
-        request = urllib2.Request(url)
-        request.get_method = lambda: 'HEAD'
-        response = urllib2.urlopen(request)
+        response = requests.head(url)
+        response.raise_for_status()
         return self._parse_last_modified(response)
 
     @_verbose_http_errors
     def file_size(self, name):
         url, version = self._parse_name(name)
-        request = urllib2.Request(url)
-        request.get_method = lambda: 'HEAD'
-        response = urllib2.urlopen(request)
-        return int(response.info().get('content-length', 0))
+        response = requests.head(url)
+        response.raise_for_status()
+        return int(response.headers.get('content-length', 0))
 
     @_verbose_http_errors
     def delete_file(self, filename):
         url, version = self._parse_name(filename)
-        request = urllib2.Request(url)
-        if version is not None:
-            request.add_header('Last-Modified', email.utils.formatdate(version))
-        request.get_method = lambda: 'DELETE'
-        try:
-            urllib2.urlopen(request)
-        except urllib2.HTTPError, r:
-            if r.code != 404:
-                logger.warning('Error when deleting file %s from %s.'
-                               % (filename, self.base_url))
+        response = requests.delete(url, headers={
+            'Last-Modified': email.utils.formatdate(version)})
+        response.raise_for_status()
 
 
 class LockManager(object):
@@ -557,7 +580,7 @@ class FcntlLockManager(LockManager):
 
     class FcntlLock(LockManager.Lock):
         def __init__(self, filename):
-            self.fd = os.open(filename, os.O_WRONLY | os.O_CREAT, 0600)
+            self.fd = os.open(filename, os.O_WRONLY | os.O_CREAT, 0o600)
 
             # Set mtime so that any future cleanup script may remove lock files
             # not used for some specified time.
@@ -882,6 +905,8 @@ class Client(object):
 
         return versioned_name
 
+    # This is a very cool method except our server doesn't support DELETE
+    # requests. (SIO-2093)
     def delete_file(self, name):
         """Deletes the file identified by ``name`` along with its metadata.
 
