@@ -512,7 +512,8 @@ class RemoteDataStore(DataStore):
         url, version = self._parse_name(filename)
         response = requests.delete(url, headers={
             'Last-Modified': email.utils.formatdate(version)})
-        response.raise_for_status()
+        # SIO-2093
+        # response.raise_for_status()
 
 
 class LockManager(object):
