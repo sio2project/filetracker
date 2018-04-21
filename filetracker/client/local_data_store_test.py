@@ -10,13 +10,15 @@ import unittest
 
 import six
 
-import filetracker
+from filetracker.client import FiletrackerError
+from filetracker.client.data_store import DataStore
+from filetracker.client.local_data_store import LocalDataStore
 
 
 class LocalDataStoreTest(unittest.TestCase):
     def setUp(self):
         self.dir_path = tempfile.mkdtemp()
-        self.store = filetracker.LocalDataStore(self.dir_path)
+        self.store = LocalDataStore(self.dir_path)
 
     def tearDown(self):
         shutil.rmtree(self.dir_path)
@@ -79,7 +81,7 @@ class LocalDataStoreTest(unittest.TestCase):
         self.store.add_stream('/foo.txt', BytesIO(b'hello'))
         self.store.delete_file('/foo.txt')
 
-        with self.assertRaises(filetracker.FiletrackerError):
+        with self.assertRaises(FiletrackerError):
             self.store.get_stream('/foo.txt')
 
     def test_list_files_should_return_list_of_file_info_entries(self):
@@ -91,7 +93,7 @@ class LocalDataStoreTest(unittest.TestCase):
         file_names = []
         for file_info in self.store.list_files():
             self.assertIsInstance(
-                    file_info, filetracker.DataStore.FileInfoEntry)
+                    file_info, DataStore.FileInfoEntry)
             self.assertIn('@', file_info.name)
             file_names.append(file_info.name.split('@')[0])
 

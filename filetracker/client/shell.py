@@ -1,13 +1,13 @@
 from __future__ import absolute_import
 from __future__ import print_function
+
 from optparse import OptionParser
-import os, os.path
-import sys
+import os
 import logging
 import shutil
 import tempfile
 
-from filetracker import Client
+from filetracker.client import Client
 
 
 _BUFFER_SIZE = 64 * 1024
