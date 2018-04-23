@@ -2,15 +2,19 @@
 
 import email.utils
 import functools
+import gzip
 import logging
+import shutil
 import time
+import tempfile
 
 import requests
 from six.moves.urllib.request import pathname2url
 
 from filetracker.client import FiletrackerError
 from filetracker.client.data_store import DataStore
-from filetracker.client.utils import split_name, versioned_name, _check_name
+from filetracker.client.utils import (split_name, versioned_name, _check_name,
+                                      _compute_checksum)
 
 logger = logging.getLogger('filetracker')
 
@@ -68,17 +72,35 @@ class RemoteDataStore(DataStore):
         raise RuntimeError("RemoteDataStore does not support streaming "
                            "uploads")
 
+    def _put_file(self, url, f, headers):
+        response = requests.put(url, data=f, headers=headers)
+        response.raise_for_status()
+        return response
+
     @_report_timing('RemoteDataStore.add_file')
     @_verbose_http_errors
-    def add_file(self, name, filename):
+    def add_file(self, name, filename, compress_hint=True):
         url, version = self._parse_name(name)
+
+        sha = _compute_checksum(filename)
+
+        headers = {
+            'Last-Modified': email.utils.formatdate(version),
+            'SHA256-Checksum': sha
+        }
 
         # Important detail: this upload is streaming.
         # http://docs.python-requests.org/en/latest/user/advanced/#streaming-uploads
+
         with open(filename, 'rb') as f:
-            headers = {'Last-Modified': email.utils.formatdate(version)}
-            response = requests.put(url, data=f, headers=headers)
-            response.raise_for_status()
+            if compress_hint:
+                with tempfile.TemporaryFile() as tmp:
+                    with gzip.open(tmp, mode='wb') as gz:
+                        shutil.copyfileobj(f, gz)
+                    tmp.seek(0)
+                    response = self._put_file(url, tmp, headers)
+            else:
+                response = self._put_file(url, f, headers)
 
         name, version = split_name(name)
         return versioned_name(name, self._parse_last_modified(response))
@@ -95,7 +117,11 @@ class RemoteDataStore(DataStore):
             raise FiletrackerError("Version %s not available. Server has %s" \
                     % (name, remote_version))
         name, version = split_name(name)
-        return response.raw, versioned_name(name, remote_version)
+
+        stream = response.raw
+        if response.headers.get('Content-Encoding') == 'gzip':
+            stream = gzip.open(response.raw)
+        return stream, versioned_name(name, remote_version)
 
     def exists(self, name):
         url, version = self._parse_name(name)
