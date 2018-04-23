@@ -11,9 +11,10 @@ setup(
     packages = find_packages(),
 
     install_requires = [
-        'six',
-        'requests',
         'flup6',
+        'plyvel',
+        'requests',
+        'six',
     ],
 
     setup_requires = [
