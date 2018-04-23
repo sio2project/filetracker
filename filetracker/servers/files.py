@@ -5,7 +5,6 @@ import os.path
 import shutil
 import email.utils
 
-import filetracker
 from filetracker.servers import base
 
 
@@ -25,7 +24,8 @@ class LocalFileServer(base.Server):
     @staticmethod
     def _get_path(environ):
         path = environ['PATH_INFO']
-        filetracker._check_name(path)
+        if '..' in path:
+            raise ValueError('Path cannot contain "..".')
         return path
 
     def handle_PUT(self, environ, start_response):

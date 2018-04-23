@@ -26,7 +26,7 @@ setup(
 
     entry_points = {
         'console_scripts': [
-            'filetracker = filetracker.shell:main',
+            'filetracker = filetracker.client.shell:main',
             'filetracker-server = filetracker.servers.run:main',
             'filetracker-cache-cleaner = filetracker.cachecleaner:main',
         ],

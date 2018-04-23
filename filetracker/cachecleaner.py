@@ -6,7 +6,7 @@ import glob
 import logging
 import time
 
-import filetracker
+from filetracker.client import Client
 
 
 logger = logging.getLogger(__name__)
@@ -92,7 +92,7 @@ class CacheCleaner(object):
         for glob_cache_dir in self.glob_cache_dirs:
             dirs.extend(glob.glob(glob_cache_dir))
         logger.debug("Glob expressions have expanded to %s", dirs)
-        self.clients = [filetracker.Client(cache_dir=dir, remote_store=None)
+        self.clients = [Client(cache_dir=dir, remote_store=None)
                         for dir in dirs]
         self.file_index = []
         for client in self.clients:
@@ -153,7 +153,7 @@ def main():
 
     parser.add_argument('-c', '--cache-dirs', dest='glob_cache_dirs',
                         nargs='+',
-                        default=[filetracker.Client.DEFAULT_CACHE_DIR],
+                        default=[Client.DEFAULT_CACHE_DIR],
                         help="Paths to the local cache directories specified "
                         "as glob expressions. If not specified, uses default "
                         "File Tracker directory: %(default)s")

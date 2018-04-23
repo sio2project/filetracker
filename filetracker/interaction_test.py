@@ -8,10 +8,11 @@ import os
 import shutil
 import signal
 import tempfile
+import time
 import unittest
 from wsgiref.simple_server import make_server
 
-import filetracker
+from filetracker.client import Client, FiletrackerError
 from filetracker.servers.files import LocalFileServer
 
 _TEST_PORT_NUMBER = 45735
@@ -27,7 +28,7 @@ class InteractionTest(unittest.TestCase):
         cls.server = LocalFileServer(cls.server_dir)
         cls.server_pid = _fork_to_server(cls.server)
 
-        cls.client = filetracker.Client(
+        cls.client = Client(
                 cache_dir=cls.cache_dir,
                 remote_url='http://127.0.0.1:{}'.format(_TEST_PORT_NUMBER))
 
@@ -69,7 +70,7 @@ class InteractionTest(unittest.TestCase):
     def test_get_file_should_raise_error_if_file_doesnt_exist(self):
         temp_file = os.path.join(self.temp_dir, 'get_doesnt_exist.txt')
         
-        with self.assertRaises(filetracker.FiletrackerError):
+        with self.assertRaises(FiletrackerError):
             self.client.get_file('/doesnt_exist', temp_file)
 
     def test_get_file_should_save_file_contents_to_destination(self):
@@ -129,6 +130,7 @@ def _fork_to_server(server):
     """Returns child server process PID."""
     pid = os.fork()
     if pid > 0:
+        time.sleep(1)   # give server some time to start
         return pid
     else:
         httpd = make_server('', _TEST_PORT_NUMBER, server)
