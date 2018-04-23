@@ -7,7 +7,7 @@ from __future__ import print_function
 from collections import defaultdict
 import time
 
-from six import StringIO
+from six import BytesIO
 
 from filetracker.client import Client
 from filetracker.client.data_store import DataStore
@@ -38,7 +38,7 @@ class DummyDataStore(DataStore):
         if version is None:
             version = max(self.versions[key] + 1, int(time.time()))
 
-        data = ''
+        data = b''
         while True:
             record = stream.read()
             if not record:
@@ -75,7 +75,7 @@ class DummyDataStore(DataStore):
         key, version = self._parse_name(name)
         if version is not None and self.versions[key] != version:
             raise KeyError("Version %s of %s not found" % (version, key))
-        return StringIO(self.data[key]), \
+        return BytesIO(self.data[key]), \
                versioned_name(key, self.versions[key])
 
     def delete_file(self, name):
