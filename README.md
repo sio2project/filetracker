@@ -1,5 +1,7 @@
 # filetracker
 
+[![Build Status](https://travis-ci.org/sio2project/filetracker.svg?branch=master)](https://travis-ci.org/sio2project/filetracker)
+
 A simple file storage module for distributed systems.
 
 ## Testing
