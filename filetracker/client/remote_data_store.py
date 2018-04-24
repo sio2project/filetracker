@@ -95,7 +95,7 @@ class RemoteDataStore(DataStore):
         with open(filename, 'rb') as f:
             if compress_hint:
                 with tempfile.TemporaryFile() as tmp:
-                    with gzip.open(tmp, mode='wb') as gz:
+                    with gzip.GzipFile(fileobj=tmp, mode='wb') as gz:
                         shutil.copyfileobj(f, gz)
                     tmp.seek(0)
                     response = self._put_file(url, tmp, headers)
@@ -118,9 +118,7 @@ class RemoteDataStore(DataStore):
                     % (name, remote_version))
         name, version = split_name(name)
 
-        stream = response.raw
-        if response.headers.get('Content-Encoding') == 'gzip':
-            stream = gzip.open(response.raw)
+        stream = FileLikeFromResponse(response)
         return stream, versioned_name(name, remote_version)
 
     def exists(self, name):
@@ -157,3 +155,22 @@ class RemoteDataStore(DataStore):
             'Last-Modified': email.utils.formatdate(version)})
         # SIO-2093
         # response.raise_for_status()
+
+
+class FileLikeFromResponse(object):
+    def __init__(self, response):
+        self.iter = response.iter_content(chunk_size=16*1024)
+        self.data = b''
+
+    def read(self, n=None):
+        if n is None:
+            # read all remaining data
+            return self.data + b''.join(c for c in self.iter)
+        else:
+            while len(self.data) < n:
+                try:
+                    self.data += next(self.iter)
+                except StopIteration:
+                    break
+            result, self.data = self.data[:n], self.data[n:]
+            return result

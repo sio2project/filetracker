@@ -64,8 +64,8 @@ class InteractionTest(unittest.TestCase):
         with open(cache_path, 'r') as cf:
             self.assertEqual(cf.read(), 'hello')
 
-        with open(remote_path, 'r') as rf:
-            self.assertEqual(rf.read(), 'hello')
+        rf, _ = self.client.get_stream('/put.txt')
+        self.assertEqual(rf.read(), b'hello')
 
     def test_get_file_should_raise_error_if_file_doesnt_exist(self):
         temp_file = os.path.join(self.temp_dir, 'get_doesnt_exist.txt')
