@@ -94,6 +94,9 @@ class RemoteDataStore(DataStore):
 
         with open(filename, 'rb') as f:
             if compress_hint:
+                # This temporary file could be avoided if the original file
+                # stream was wrapped into a stream outputting gzipped data
+                # that could be passed to _put_file.
                 with tempfile.TemporaryFile() as tmp:
                     with gzip.GzipFile(fileobj=tmp, mode='wb') as gz:
                         shutil.copyfileobj(f, gz)
@@ -118,7 +121,7 @@ class RemoteDataStore(DataStore):
                     % (name, remote_version))
         name, version = split_name(name)
 
-        stream = FileLikeFromResponse(response)
+        stream = _FileLikeFromResponse(response)
         return stream, versioned_name(name, remote_version)
 
     def exists(self, name):
@@ -157,20 +160,20 @@ class RemoteDataStore(DataStore):
         # response.raise_for_status()
 
 
-class FileLikeFromResponse(object):
+class _FileLikeFromResponse(object):
     def __init__(self, response):
         self.iter = response.iter_content(chunk_size=16*1024)
         self.data = b''
 
-    def read(self, n=None):
-        if n is None:
+    def read(self, size=None):
+        if size is None:
             # read all remaining data
             return self.data + b''.join(c for c in self.iter)
         else:
-            while len(self.data) < n:
+            while len(self.data) < size:
                 try:
                     self.data += next(self.iter)
                 except StopIteration:
                     break
-            result, self.data = self.data[:n], self.data[n:]
+            result, self.data = self.data[:size], self.data[size:]
             return result
