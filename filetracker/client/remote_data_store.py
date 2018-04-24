@@ -10,6 +10,7 @@ import tempfile
 
 import requests
 from six.moves.urllib.request import pathname2url
+from six.moves.urllib.parse import urlencode
 
 from filetracker.client import FiletrackerError
 from filetracker.client.data_store import DataStore
@@ -72,8 +73,15 @@ class RemoteDataStore(DataStore):
         raise RuntimeError("RemoteDataStore does not support streaming "
                            "uploads")
 
-    def _put_file(self, url, f, headers):
-        response = requests.put(url, data=f, headers=headers)
+    def _encode_url_params(self, version):
+        url_params = {
+            'last_modified': email.utils.formatdate(version)
+        }
+        return urlencode(url_params)
+
+    def _put_file(self, url, version, f, headers):
+        response = requests.put(url + "?" + self._encode_url_params(version),
+                                data=f, headers=headers)
         response.raise_for_status()
         return response
 
@@ -85,7 +93,6 @@ class RemoteDataStore(DataStore):
         sha = _compute_checksum(filename)
 
         headers = {
-            'Last-Modified': email.utils.formatdate(version),
             'SHA256-Checksum': sha
         }
 
@@ -109,9 +116,9 @@ class RemoteDataStore(DataStore):
                     with gzip.GzipFile(fileobj=tmp, mode='wb') as gz:
                         shutil.copyfileobj(f, gz)
                     tmp.seek(0)
-                    response = self._put_file(url, tmp, headers)
+                    response = self._put_file(url, version, tmp, headers)
             else:
-                response = self._put_file(url, f, headers)
+                response = self._put_file(url, version, f, headers)
 
         name, version = split_name(name)
         return versioned_name(name, self._parse_last_modified(response))
@@ -162,8 +169,8 @@ class RemoteDataStore(DataStore):
     @_verbose_http_errors
     def delete_file(self, filename):
         url, version = self._parse_name(filename)
-        response = requests.delete(url, headers={
-            'Last-Modified': email.utils.formatdate(version)})
+        response = requests.delete(url
+                                   + "?" + self._encode_url_params(version))
         # SIO-2093
         # response.raise_for_status()
 
