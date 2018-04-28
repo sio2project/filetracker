@@ -118,6 +118,10 @@ class FileStorage(object):
         if link_count is not None:
             # Don't create new blob.
             db.put(name.encode('utf8'), link_count + 1)
+
+            # Close this early to prevent potential deadlock in delete().
+            self._close_db_for_prefix(prefix, db)
+
             if os.path.exists(link_path):
                 # Lend the lock to delete().
                 self.delete(name, version, lock=False)
@@ -146,8 +150,9 @@ class FileStorage(object):
                 else:
                     with gzip.open(blob_path, 'wb') as blob:
                         _copy_stream(data, blob, size)
+            
+            self._close_db_for_prefix(prefix, db)
 
-        self._close_db_for_prefix(prefix, db)
         self._unlock_file(file_lock)
 
     def delete(name, version, lock=True):
