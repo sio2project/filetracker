@@ -24,13 +24,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import errno
 import fcntl
 import gzip
 import hashlib
 import os
 import shutil
 import tempfile
-import time
 
 import bsddb3
 
@@ -50,12 +50,12 @@ class FileStorage(object):
         # Maps prefixes to lock FDs.
         self._db_locks = {}
 
-        os.makedirs(self.blobs_dir, exist_ok=True)
-        os.makedirs(self.links_dir, exist_ok=True)
-        os.makedirs(self.locks_dir, exist_ok=True)
-        os.makedirs(self.db_path, exist_ok=True)
+        _makedirs(self.blobs_dir)
+        _makedirs(self.links_dir)
+        _makedirs(self.locks_dir)
+        _makedirs(self.db_path)
 
-    def store(name, data, version, size=0, compressed=False, digest=None):
+    def store(self, name, data, version, size=0, compressed=False, digest=None):
         """Adds a new file to the storage.
         
         If the file with the same name existed before, it's not
@@ -91,10 +91,13 @@ class FileStorage(object):
 
         file_lock = self._lock_file(os.path.join('links', name))
 
+        # Path to temporary file that may be created in some cases.
+        temp_file_path = None
+
         if digest is None:
             # Write data to temp file and calculate hash.
             temp_file_fd, temp_file_path = tempfile.mkstemp()
-            temp_file = os.fdopen(temp_file_fd)
+            temp_file = os.fdopen(temp_file_fd, 'wb')
             _copy_stream(data, temp_file, size)
             temp_file.close()
 
@@ -102,7 +105,7 @@ class FileStorage(object):
                 # If data was already compressed, we have to decompress it
                 # before calculating the digest.
                 raw_file_fd, raw_file_path = tempfile.mkstemp()
-                raw_file = os.fdopen(raw_file_fd)
+                raw_file = os.fdopen(raw_file_fd, 'wb')
 
                 with gzip.open(temp_file_path, 'rb') as compressed_file:
                     shutil.copyfileobj(compressed_file, raw_file)
@@ -118,23 +121,15 @@ class FileStorage(object):
         prefix = digest[0:2]
         db_lock = self._lock_file(os.path.join('db', prefix))
 
-        link_count = db.get(name.encode('utf8'))
-        db.put(name.encode('utf8'), link_count + 1)
+        try:
+            link_count = int(self.db[name.encode('utf8')])
+        except KeyError:
+            link_count = 0
 
-        if link_count is not None:
-            # Unlock early to prevent potential deadlock in delete().
-            self._unlock_file(db_lock)
+        self.db[name.encode('utf8')] = str(link_count + 1).encode('utf8')
 
-            if os.path.exists(link_path):
-                # Lend the lock to delete().
-                self.delete(name, version, lock=False)
-
-            _create_file_dirs(link_path)
-            os.symlink(blob_path, link_path)
-
-            if temp_file_path:
-                os.remove(temp_file_path)
-        else:
+        if link_count == 0:
+            # Create a new blob.
             _create_file_dirs(blob_path)
             if compressed:
                 if temp_file_path:
@@ -144,19 +139,29 @@ class FileStorage(object):
                         _copy_stream(data, blob, size)
             else:
                 if temp_file_path:
-                    with open(temp_file_path) as raw,\
+                    with open(temp_file_path, 'rb') as raw,\
                             gzip.open(blob_path, 'wb') as blob:
                         shutil.copyfileobj(raw, blob)
-                    os.unlink(temp_file_path)
                 else:
                     with gzip.open(blob_path, 'wb') as blob:
                         _copy_stream(data, blob, size)
-            
-            self._unlock_file(db_lock)
 
+        if temp_file_path and os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
+            
+        self._unlock_file(db_lock)
+
+        if os.path.exists(link_path):
+            # Lend the link lock to delete().
+            self.delete(name, version, lock=False)
+
+        _create_file_dirs(link_path)
+        os.symlink(blob_path, link_path)
+
+        os.utime(link_path, (version, version))
         self._unlock_file(file_lock)
 
-    def delete(name, version, lock=True):
+    def delete(self, name, version, lock=True):
         pass
 
     def _lock_file(self, name):
@@ -183,7 +188,7 @@ class FileStorage(object):
     def _unlock_file(self, lock):
         """Releases a lock acquired by ``_lock_file``."""
         fd = lock
-        fcntl.flock(fd, fnctl.LOCK_UN)
+        fcntl.flock(fd, fcntl.LOCK_UN)
         os.close(fd)
 
     def _link_path(self, name):
@@ -227,7 +232,7 @@ def _copy_stream(src, dest, length=0):
 def _create_file_dirs(file_path):
     """Creates directory tree to file if it doesn't exist."""
     dir_name = os.path.dirname(file_path)
-    os.makedirs(dir_name, exist_ok=True)
+    _makedirs(dir_name)
 
 
 def _file_digest(path):
@@ -240,4 +245,13 @@ def _file_digest(path):
 
 
 def _file_version(path):
-    return os.stat(path).m_time
+    return os.stat(path).st_mtime
+
+
+def _makedirs(path):
+    """A py2 wrapper for os.makedirs() that simulates exist_ok=True flag."""
+    try:
+        os.makedirs(path)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
