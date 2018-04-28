@@ -1,8 +1,4 @@
 sudo: false
-addons:
-  apt:
-    packages:
-      libdb-dev
 language: python
 python:
   - "2.7"
