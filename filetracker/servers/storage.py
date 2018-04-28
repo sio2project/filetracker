@@ -14,10 +14,10 @@ The storage strategy is as follows:
   have their own modification time ("version") different from the
   modification time of the blob.
 
-- Additional metadata about blobs is stored in a LevelDB database.
+- Additional metadata about blobs is stored in a BSDDB kv-store.
 - The only metadata stored ATM is the symlink count.
-- LevelDB doesn't allow concurrent access, so a separate database
-  is maintained for every prefix (256 in total).
+- Accesses to DB are protected by fcntl locks, with one lock
+  for each prefix (256 total).
 """
 
 from __future__ import absolute_import
@@ -32,7 +32,7 @@ import shutil
 import tempfile
 import time
 
-_DB_LOCK_SLEEP_TIME_MS = 1
+import bsddb3
 
 
 class FileStorage(object):
@@ -43,7 +43,12 @@ class FileStorage(object):
         self.blobs_dir = os.path.join(base_dir, 'blobs')
         self.links_dir = os.path.join(base_dir, 'links')
         self.locks_dir = os.path.join(base_dir, 'locks')
-        self.db_path = os.path.join(base_dir, 'db')
+
+        self.db_path = os.path.join(base_dir, 'metadata.db')
+        self.db = bsddb3.hashopen(self.db_path)
+
+        # Maps prefixes to lock FDs.
+        self._db_locks = {}
 
         os.makedirs(self.blobs_dir, exist_ok=True)
         os.makedirs(self.links_dir, exist_ok=True)
@@ -84,7 +89,7 @@ class FileStorage(object):
         if os.path.exists(link_path) and _file_version(link_path) > version:
             return
 
-        file_lock = self._lock_file(name)
+        file_lock = self._lock_file(os.path.join('links', name))
 
         if digest is None:
             # Write data to temp file and calculate hash.
@@ -111,16 +116,14 @@ class FileStorage(object):
         blob_path = self._blob_path(digest)
 
         prefix = digest[0:2]
-        db = self._open_db_for_prefix(prefix)
+        db_lock = self._lock_file(os.path.join('db', prefix))
 
         link_count = db.get(name.encode('utf8'))
+        db.put(name.encode('utf8'), link_count + 1)
 
         if link_count is not None:
-            # Don't create new blob.
-            db.put(name.encode('utf8'), link_count + 1)
-
-            # Close this early to prevent potential deadlock in delete().
-            self._close_db_for_prefix(prefix, db)
+            # Unlock early to prevent potential deadlock in delete().
+            self._unlock_file(db_lock)
 
             if os.path.exists(link_path):
                 # Lend the lock to delete().
@@ -132,8 +135,6 @@ class FileStorage(object):
             if temp_file_path:
                 os.remove(temp_file_path)
         else:
-            db.put(name.encode('utf8'), link_count + 1)
-
             _create_file_dirs(blob_path)
             if compressed:
                 if temp_file_path:
@@ -151,7 +152,7 @@ class FileStorage(object):
                     with gzip.open(blob_path, 'wb') as blob:
                         _copy_stream(data, blob, size)
             
-            self._close_db_for_prefix(prefix, db)
+            self._unlock_file(db_lock)
 
         self._unlock_file(file_lock)
 
@@ -161,12 +162,13 @@ class FileStorage(object):
     def _lock_file(self, name):
         """Acquires an exclusive (writer) lock to a file.
         
-        Note that "file" means exactly that: one blob may have multiple
-        links (each of them is a "file"), and locking one of them doesn't
-        block access to the others.
+        Note that "file" here means an arbitrary path, which may or
+        may not correspond to an actual symlink. The "locked" file
+        need not to exist, which is the case with database prefix locks.
 
         Args:
-            name: name of the file to be locked
+            name: name of the file to be locked.
+                This may also be a path with delimiters.
 
         Returns:
             object that should be passed to ``_unlock_file`` later
@@ -183,33 +185,6 @@ class FileStorage(object):
         fd = lock
         fcntl.flock(fd, fnctl.LOCK_UN)
         os.close(fd)
-
-    def _open_db_for_prefix(self, prefix):
-        """Opens LevelDB connection to database for prefix
-
-        LevelDB doesn't support concurrent connections, so this method
-        locks until the connection is available.
-
-        Args:
-            prefix: hex string with first byte of the blob group
-
-        Returns:
-            plyvel.DB object
-        """
-        db_dir = os.path.join(self.db_path, prefix)
-        while True:
-            try:
-                db = plyvel.DB(db_dir, create_if_missing=True)
-                return db
-            except plyvel.IOError:
-                # DB is locked, try again.
-                time.sleep(_DB_LOCK_SLEEP_TIME_MS)
-                continue
-
-    def _close_db_for_prefix(self, prefix, db):
-        # Nothing interesing here, but if different locking strategy
-        # was to be implemented, this method should be useful.
-        db.close()
 
     def _link_path(self, name):
         return os.path.join(self.links_dir, name)

@@ -11,8 +11,8 @@ setup(
     packages = find_packages(),
 
     install_requires = [
+        'bsddb3',
         'flup6',
-        'plyvel',
         'requests',
         'six',
     ],
