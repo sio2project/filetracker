@@ -24,6 +24,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import contextlib
 import errno
 import fcntl
 import gzip
@@ -46,9 +47,6 @@ class FileStorage(object):
 
         self.db_path = os.path.join(base_dir, 'metadata.db')
         self.db = bsddb3.hashopen(self.db_path)
-
-        # Maps prefixes to lock FDs.
-        self._db_locks = {}
 
         _makedirs(self.blobs_dir)
         _makedirs(self.links_dir)
@@ -85,117 +83,91 @@ class FileStorage(object):
                 If specified, the digest will not be computed again, saving
                 resources.
         """
-        link_path = self._link_path(name)
-        if os.path.exists(link_path) and _file_version(link_path) > version:
-            return
+        with _exclusive_lock(self._lock_path('links', name)):
+            link_path = self._link_path(name)
+            if os.path.exists(link_path) and _file_version(link_path) > version:
+                return
 
-        file_lock = self._lock_file(os.path.join('links', name))
+            # Path to temporary file that may be created in some cases.
+            temp_file_path = None
 
-        # Path to temporary file that may be created in some cases.
-        temp_file_path = None
+            if digest is None:
+                # Write data to temp file and calculate hash.
+                temp_file_fd, temp_file_path = tempfile.mkstemp()
+                temp_file = os.fdopen(temp_file_fd, 'wb')
+                _copy_stream(data, temp_file, size)
+                temp_file.close()
 
-        if digest is None:
-            # Write data to temp file and calculate hash.
-            temp_file_fd, temp_file_path = tempfile.mkstemp()
-            temp_file = os.fdopen(temp_file_fd, 'wb')
-            _copy_stream(data, temp_file, size)
-            temp_file.close()
+                if compressed:
+                    # If data was already compressed, we have to decompress it
+                    # before calculating the digest.
+                    raw_file_fd, raw_file_path = tempfile.mkstemp()
+                    raw_file = os.fdopen(raw_file_fd, 'wb')
 
-            if compressed:
-                # If data was already compressed, we have to decompress it
-                # before calculating the digest.
-                raw_file_fd, raw_file_path = tempfile.mkstemp()
-                raw_file = os.fdopen(raw_file_fd, 'wb')
+                    with gzip.open(temp_file_path, 'rb') as compressed_file:
+                        shutil.copyfileobj(compressed_file, raw_file)
+                    raw_file.close()
 
-                with gzip.open(temp_file_path, 'rb') as compressed_file:
-                    shutil.copyfileobj(compressed_file, raw_file)
-                raw_file.close()
-
-                digest = _file_digest(raw_file_path)
-                os.unlink(raw_file_path)
-            else:
-                digest = _file_digest(temp_file_path)
-
-        blob_path = self._blob_path(digest)
-
-        prefix = digest[0:2]
-        db_lock = self._lock_file(os.path.join('db', prefix))
-
-        try:
-            link_count = int(self.db[name.encode('utf8')])
-        except KeyError:
-            link_count = 0
-
-        self.db[name.encode('utf8')] = str(link_count + 1).encode('utf8')
-
-        if link_count == 0:
-            # Create a new blob.
-            _create_file_dirs(blob_path)
-            if compressed:
-                if temp_file_path:
-                    os.rename(temp_file_path, blob_path)
+                    digest = _file_digest(raw_file_path)
+                    os.unlink(raw_file_path)
                 else:
-                    with open(blob_path, 'wb') as blob:
-                        _copy_stream(data, blob, size)
-            else:
-                if temp_file_path:
-                    with open(temp_file_path, 'rb') as raw,\
-                            gzip.open(blob_path, 'wb') as blob:
-                        shutil.copyfileobj(raw, blob)
-                else:
-                    with gzip.open(blob_path, 'wb') as blob:
-                        _copy_stream(data, blob, size)
+                    digest = _file_digest(temp_file_path)
 
-        if temp_file_path and os.path.exists(temp_file_path):
-            os.unlink(temp_file_path)
+            blob_path = self._blob_path(digest)
+            prefix = digest[0:2]
             
-        self._unlock_file(db_lock)
+            with _exclusive_lock(self._lock_path('db', prefix)):
+                try:
+                    link_count = int(self.db[digest.encode('utf8')])
+                except KeyError:
+                    link_count = 0
 
-        if os.path.exists(link_path):
-            # Lend the link lock to delete().
-            self.delete(name, version, lock=False)
+                self.db[digest.encode('utf8')] = (
+                        str(link_count + 1).encode('utf8'))
 
-        _create_file_dirs(link_path)
-        os.symlink(blob_path, link_path)
+                if link_count == 0:
+                    # Create a new blob.
+                    _create_file_dirs(blob_path)
+                    if compressed:
+                        if temp_file_path:
+                            os.rename(temp_file_path, blob_path)
+                        else:
+                            with open(blob_path, 'wb') as blob:
+                                _copy_stream(data, blob, size)
+                    else:
+                        if temp_file_path:
+                            with open(temp_file_path, 'rb') as raw,\
+                                    gzip.open(blob_path, 'wb') as blob:
+                                shutil.copyfileobj(raw, blob)
+                        else:
+                            with gzip.open(blob_path, 'wb') as blob:
+                                _copy_stream(data, blob, size)
 
-        os.utime(link_path, (version, version))
-        self._unlock_file(file_lock)
+                if temp_file_path and os.path.exists(temp_file_path):
+                    os.unlink(temp_file_path)
+
+            if os.path.exists(link_path):
+                # Lend the link lock to delete().
+                # Note that DB lock has to be released in advance, otherwise
+                # deadlock is possible in concurrent scenarios.
+                self.delete(name, version, lock=False)
+
+            _create_file_dirs(link_path)
+            os.symlink(blob_path, link_path)
+
+            os.utime(link_path, (version, version))
 
     def delete(self, name, version, lock=True):
         pass
-
-    def _lock_file(self, name):
-        """Acquires an exclusive (writer) lock to a file.
-        
-        Note that "file" here means an arbitrary path, which may or
-        may not correspond to an actual symlink. The "locked" file
-        need not to exist, which is the case with database prefix locks.
-
-        Args:
-            name: name of the file to be locked.
-                This may also be a path with delimiters.
-
-        Returns:
-            object that should be passed to ``_unlock_file`` later
-        """
-        lock_path = os.path.join(self.locks_dir, name)
-        _create_file_dirs(lock_path)
-
-        fd = os.open(lock_path, os.O_WRONLY | os.O_CREAT, 0o600)
-        fcntl.flock(fd, fcntl.LOCK_EX)
-        return fd
-
-    def _unlock_file(self, lock):
-        """Releases a lock acquired by ``_lock_file``."""
-        fd = lock
-        fcntl.flock(fd, fcntl.LOCK_UN)
-        os.close(fd)
 
     def _link_path(self, name):
         return os.path.join(self.links_dir, name)
 
     def _blob_path(self, digest):
         return os.path.join(self.blobs_dir, digest[0:2], digest)
+
+    def _lock_path(self, *path_parts):
+        return os.path.join(self.locks_dir, *path_parts)
 
 
 _BUFFER_SIZE = 64 * 1024
@@ -246,6 +218,20 @@ def _file_digest(path):
 
 def _file_version(path):
     return os.stat(path).st_mtime
+
+
+@contextlib.contextmanager
+def _exclusive_lock(path):
+    """A simple wrapper for fcntl exclusive lock."""
+    _create_file_dirs(path)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT, 0o600)
+    fcntl.flock(fd, fcntl.LOCK_EX)
+
+    try:
+        yield
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
 
 
 def _makedirs(path):
