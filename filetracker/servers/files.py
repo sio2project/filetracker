@@ -4,6 +4,7 @@ from __future__ import absolute_import
 import os.path
 import shutil
 import email.utils
+from six.moves.urllib.parse import parse_qs
 
 from filetracker.servers import base
 
@@ -28,6 +29,10 @@ class LocalFileServer(base.Server):
             raise ValueError('Path cannot contain "..".')
         return path
 
+    def parse_query_params(self, environ):
+        return parse_qs(environ['QUERY_STRING'] or '')
+
+
     def handle_PUT(self, environ, start_response):
         path = self.dir + self._get_path(environ)
         dirname = os.path.dirname(path)
@@ -36,7 +41,8 @@ class LocalFileServer(base.Server):
 
         content_length = int(environ.get('CONTENT_LENGTH'))
 
-        last_modified = environ.get('HTTP_LAST_MODIFIED')
+        query_params = self.parse_query_params(environ)
+        last_modified = query_params.get('last_modified')[0]
         if last_modified:
             last_modified = email.utils.parsedate_tz(last_modified)
             last_modified = email.utils.mktime_tz(last_modified)
@@ -70,7 +76,8 @@ class LocalFileServer(base.Server):
         return [
                 ('Last-Modified', email.utils.formatdate(st.st_mtime)),
                 ('Content-Type', 'application/octet-stream'),
-                ('Content-Length', str(st.st_size))
+                ('Content-Length', str(st.st_size)),
+                ('Content-Encoding', 'gzip')
             ]
 
     def handle_GET(self, environ, start_response):
