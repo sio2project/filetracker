@@ -22,7 +22,7 @@ class Server(object):
                     ('X-Exception', str(e))
                 ]
             start_response(status, response_headers, sys.exc_info())
-            return [traceback.format_exc()]
+            return [traceback.format_exc().encode()]
 
 
 def start_cgi(server):
