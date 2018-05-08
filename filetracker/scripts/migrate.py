@@ -1,8 +1,10 @@
 """Script to upload a file tree to a remote filetracker server.
 
 The intention for this script is to support migration to new filetracker
-servers that change the format of disk storage. It should be used with
-redirect functionality of the new server.
+servers that change the format of disk storage.
+
+For performing the migration in production, you may also be interested
+in the redirect functionality of the filetracker server.
 """
 
 from __future__ import absolute_import
