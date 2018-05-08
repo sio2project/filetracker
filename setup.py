@@ -13,6 +13,7 @@ setup(
     install_requires = [
         'bsddb3',
         'flup6',
+        'progressbar2',
         'requests',
         'six',
     ],
@@ -30,6 +31,7 @@ setup(
             'filetracker = filetracker.client.shell:main',
             'filetracker-server = filetracker.servers.run:main',
             'filetracker-cache-cleaner = filetracker.cachecleaner:main',
+            'filetracker-migrate = filetracker.scripts.migrate:main',
         ],
     }
 )
