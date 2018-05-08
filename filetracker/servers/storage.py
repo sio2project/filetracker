@@ -34,6 +34,7 @@ import shutil
 import tempfile
 
 import bsddb3
+import six
 
 
 class FileStorage(object):
@@ -101,15 +102,8 @@ class FileStorage(object):
                 if compressed:
                     # If data was already compressed, we have to decompress it
                     # before calculating the digest.
-                    raw_file_fd, raw_file_path = tempfile.mkstemp()
-                    raw_file = os.fdopen(raw_file_fd, 'wb')
-
                     with gzip.open(temp_file_path, 'rb') as compressed_file:
-                        shutil.copyfileobj(compressed_file, raw_file)
-                    raw_file.close()
-
-                    digest = _file_digest(raw_file_path)
-                    os.unlink(raw_file_path)
+                        digest = _file_digest(compressed_file)
                 else:
                     digest = _file_digest(temp_file_path)
 
@@ -207,12 +201,26 @@ def _create_file_dirs(file_path):
     _makedirs(dir_name)
 
 
-def _file_digest(path):
-    """Calculates SHA256 digest of a file."""
+def _file_digest(source):
+    """Calculates SHA256 digest of a file.
+
+    Args:
+        source: either a file-like object or a path to file
+    """
     hash_sha256 = hashlib.sha256()
-    with open(path, 'rb') as f:
-        for chunk in iter(lambda: f.read(_BUFFER_SIZE), b""):
-            hash_sha256.update(chunk)
+
+    should_close = False
+
+    if isinstance(source, six.string_types):
+        should_close = True
+        source = open(source, 'rb')
+
+    for chunk in iter(lambda: source.read(_BUFFER_SIZE), b''):
+        hash_sha256.update(chunk)
+
+    if should_close:
+        source.close()
+
     return hash_sha256.hexdigest()
 
 
