@@ -64,8 +64,8 @@ class InteractionTest(unittest.TestCase):
         with open(cache_path, 'r') as cf:
             self.assertEqual(cf.read(), 'hello')
 
-        rf, _ = self.client.get_stream('/put.txt')
-        self.assertEqual(rf.read(), b'hello')
+        with open(remote_path, 'r') as rf:
+            self.assertEqual(rf.read(), 'hello')
 
     def test_get_file_should_raise_error_if_file_doesnt_exist(self):
         temp_file = os.path.join(self.temp_dir, 'get_doesnt_exist.txt')
@@ -124,30 +124,6 @@ class InteractionTest(unittest.TestCase):
 
         self.assertEqual(
                 self.client.file_size('/size.txt'), remote_size)
-
-    def test_put_older_should_fail(self):
-        """This test assumes file version is stored in mtime.
-        """
-        src_file = os.path.join(self.temp_dir, 'older.txt')
-        with open(src_file, 'wb') as sf:
-            sf.write(b'version 1')
-
-        self.client.put_file('/older.txt@1', src_file)
-
-        with open(src_file, 'wb') as sf:
-            sf.write(b'version 2')
-
-        self.client.put_file('/older.txt@2', src_file)
-
-        with open(src_file, 'wb') as sf:
-            sf.write(b'version 3 (1)')
-
-        self.client.put_file('/older.txt@1', src_file)
-
-        f, _ = self.client.get_stream('/older.txt')
-        self.assertEqual(f.read(), b'version 2')
-        with self.assertRaises(FiletrackerError):
-            self.client.get_stream('/older.txt@1')
 
 
 def _fork_to_server(server):

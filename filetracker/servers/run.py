@@ -20,7 +20,7 @@ DEFAULT_PORT = 9999
 def main(args=None):
     epilog = "If LIGHTTPD_DIR is set in environment, it is assumed that " \
         "the lighttpd binary resides in that directory together with " \
-        "the required modules: mod_fastcgi, mod_setenv and mod_status."
+        "the required modules: mod_fastcgi and mod_status."
     parser = OptionParser(epilog=epilog)
     parser.add_option('-p', '--port', dest='port', default=DEFAULT_PORT,
             type="int",
@@ -56,7 +56,7 @@ def main(args=None):
             server.document-root = "%(docroot)s"
             server.port = %(port)d
             server.bind = "%(listen_on)s"
-            server.modules = ( "mod_fastcgi", "mod_status", "mod_setenv" )
+            server.modules = ( "mod_fastcgi", "mod_status" )
             status.status-url = "/status"
             #debug.log-response-header = "enable"
             #debug.log-request-header = "enable"
@@ -66,7 +66,6 @@ def main(args=None):
             mimetype.assign = (
                 "" => "application/octet-stream"
             )
-            setenv.add-response-header = ( "Content-Encoding" => "gzip" )
             $HTTP["request-method"] !~ "^(GET|HEAD)" {
                 fastcgi.server += (
                   "/files" =>
