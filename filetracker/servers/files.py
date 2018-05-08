@@ -86,18 +86,18 @@ class LocalFileServer(base.Server):
         # from self.dir instead of going through this code.
         # But the server must generate Last-Modified headers.
         path = self.dir + self._get_path(environ)
-        if not os.path.exists(path):
+        if not os.path.isfile(path):
             start_response('404 Not Found', [('Content-Type', 'text/plain')])
-            return ['File not found: %s' % path]
+            return [('File not found: %s' % path).encode()]
         start_response('200 OK', self._file_headers(path))
         return self._fileobj_iterator(open(path, 'rb'))
 
     def handle_HEAD(self, environ, start_response):
         # This is a standard HEAD with nothing fancy.
         path = self.dir + self._get_path(environ)
-        if not os.path.exists(path):
+        if not os.path.isfile(path):
             start_response('404 Not Found', [('Content-Type', 'text/plain')])
-            return ['File not found: %s' % path]
+            return [('File not found: %s' % path).encode()]
         start_response('200 OK', self._file_headers(path))
         return []
 
