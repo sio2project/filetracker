@@ -73,7 +73,8 @@ class LocalFileServer(base.Server):
         return [
                 ('Last-Modified', email.utils.formatdate(st.st_mtime)),
                 ('Content-Type', 'application/octet-stream'),
-                ('Content-Length', str(st.st_size))
+                ('Content-Length', str(st.st_size)),
+                ('Content-Encoding', 'gzip')
             ]
 
     def handle_GET(self, environ, start_response):
