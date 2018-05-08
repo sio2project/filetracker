@@ -111,13 +111,13 @@ class FileStorage(object):
             prefix = digest[0:2]
             
             with _exclusive_lock(self._lock_path('db', prefix)):
+                digest_bytes = digest.encode('utf8')
                 try:
-                    link_count = int(self.db[digest.encode('utf8')])
+                    link_count = int(self.db[digest_bytes])
                 except KeyError:
                     link_count = 0
 
-                self.db[digest.encode('utf8')] = (
-                        str(link_count + 1).encode('utf8'))
+                self.db[digest_bytes] = str(link_count + 1).encode('utf8')
 
                 if link_count == 0:
                     # Create a new blob.
