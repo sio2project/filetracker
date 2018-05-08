@@ -10,11 +10,15 @@ from __future__ import division
 from __future__ import print_function
 
 import argparse
+import contextlib
 import os
 
 import progressbar
 
 from filetracker.client import Client
+
+# Value used for aligning printed action names
+_ACTION_LENGTH = 25
 
 
 def main():
@@ -26,19 +30,31 @@ def main():
             help='if set, progress bar is not printed')
 
     args = parser.parse_args()
-    root, url = args.files, args.url
+    root, url, silent = args.files, args.url, args.silent
 
     # Create a client without local cache.
     client = Client(local_store=None, remote_url=url)
 
     # Calculate total size
     total_size = 0
-    for cur_dir, _, files in os.walk(root):
-        for file_name in files:
-            total_size += os.path.getsize(os.path.join(cur_dir, file_name))
 
-    widgets = [
+    size_widgets = [
             ' [', progressbar.Timer(format='Time: %(elapsed)s'), '] ',
+            ' Calculating file size '.ljust(_ACTION_LENGTH),
+            ' ', progressbar.DataSize(), ' ',
+            progressbar.BouncingBar(),
+    ]
+
+    with _conditional_bar(show=not silent, widgets=size_widgets) as bar:
+        for cur_dir, _, files in os.walk(root):
+            for file_name in files:
+                total_size += os.path.getsize(os.path.join(cur_dir, file_name))
+                if bar:
+                    bar.update(total_size)
+
+    upload_widgets = [
+            ' [', progressbar.Timer(format='Time: %(elapsed)s'), '] ',
+            ' Uploading files '.ljust(_ACTION_LENGTH),
             ' ', progressbar.DataSize(), ' ',
             progressbar.Bar(),
             ' ', progressbar.Percentage(), ' ',
@@ -47,7 +63,9 @@ def main():
 
     processed_size = 0
 
-    with progressbar.ProgressBar(max_value=total_size, widgets=widgets) as bar:
+    with _conditional_bar(show=not silent,
+                          max_value=total_size,
+                          widgets=upload_widgets) as bar:
         for cur_dir, _, files in os.walk(root):
             for file_name in files:
                 file_path = os.path.join(cur_dir, file_name)
@@ -62,7 +80,18 @@ def main():
                 client.put_file(remote_name, file_path, to_local_store=False)
 
                 processed_size += file_size
-                bar.update(processed_size)
+                if bar:
+                    bar.update(processed_size)
+
+
+@contextlib.contextmanager
+def _conditional_bar(show, **kwargs):
+    """A wrapper for ProgressBar context manager that accepts condition."""
+    if show:
+        with progressbar.ProgressBar(**kwargs) as bar:
+            yield bar
+    else:
+        yield None
 
 
 if __name__ == '__main__':
