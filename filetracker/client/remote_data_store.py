@@ -101,9 +101,17 @@ class RemoteDataStore(DataStore):
 
         with open(filename, 'rb') as f:
             if compress_hint:
-                # This temporary file could be avoided if the original file
-                # stream was wrapped into a stream outputting gzipped data
-                # that could be passed to _put_file.
+                # Unfortunately it seems a temporary file is required here.
+                # Our server requires Content-Length to be present, because
+                # some WSGI implementations (among others the one used in
+                # our tests) are not required to support EOF (instead the
+                # user is required to not read beyond content length,
+                # but that cannot be done if we don't know the content
+                # length). As content length is required for the tests to
+                # work, we need to send it, and to be able to compute it we
+                # need to temporarily store the compressed data before
+                # sending. It can be stored in memory or in a temporary file
+                #  and a temporary file seems to be a more suitable choice.
                 with tempfile.TemporaryFile() as tmp:
                     with gzip.GzipFile(fileobj=tmp, mode='wb') as gz:
                         shutil.copyfileobj(f, gz)
