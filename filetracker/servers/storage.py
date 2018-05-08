@@ -45,14 +45,32 @@ class FileStorage(object):
         self.blobs_dir = os.path.join(base_dir, 'blobs')
         self.links_dir = os.path.join(base_dir, 'links')
         self.locks_dir = os.path.join(base_dir, 'locks')
-
-        self.db_path = os.path.join(base_dir, 'metadata.db')
-        self.db = bsddb3.hashopen(self.db_path)
+        self.db_dir = os.path.join(base_dir, 'db')
 
         _makedirs(self.blobs_dir)
         _makedirs(self.links_dir)
         _makedirs(self.locks_dir)
-        _makedirs(self.db_path)
+        _makedirs(self.db_dir)
+
+        # https://docs.oracle.com/cd/E17076_05/html/programmer_reference/transapp_env_open.html
+        self.db_env = bsddb3.db.DBEnv()
+        self.db_env.open(
+                self.db_dir,
+                bsddb3.db.DB_CREATE
+                | bsddb3.db.DB_INIT_LOCK
+                | bsddb3.db.DB_INIT_LOG
+                | bsddb3.db.DB_INIT_MPOOL
+                | bsddb3.db.DB_INIT_TXN)
+
+        self.db = bsddb3.db.DB(self.db_env)
+        self.db.open(
+                'metadata',
+                dbtype=bsddb3.db.DB_HASH,
+                flags=bsddb3.db.DB_CREATE | bsddb3.db.DB_AUTO_COMMIT)
+
+    def __del__(self):
+        self.db.close()
+        self.db_env.close()
 
     def store(self, name, data, version, size=0, compressed=False, digest=None):
         """Adds a new file to the storage.
@@ -110,14 +128,15 @@ class FileStorage(object):
             blob_path = self._blob_path(digest)
             prefix = digest[0:2]
             
-            with _exclusive_lock(self._lock_path('db', prefix)):
+            with self._lock_blob_with_txn(digest) as txn:
                 digest_bytes = digest.encode('utf8')
                 try:
-                    link_count = int(self.db[digest_bytes])
+                    link_count = int(self.db.get(digest_bytes, 0, txn=txn))
                 except KeyError:
                     link_count = 0
 
-                self.db[digest_bytes] = str(link_count + 1).encode('utf8')
+                new_count = str(link_count + 1).encode('utf8')
+                self.db.put(digest_bytes, new_count, txn=txn)
 
                 if link_count == 0:
                     # Create a new blob.
@@ -162,6 +181,22 @@ class FileStorage(object):
 
     def _lock_path(self, *path_parts):
         return os.path.join(self.locks_dir, *path_parts)
+
+    @contextlib.contextmanager
+    def _lock_blob_with_txn(self, digest):
+        """A wrapper for ``_exclusive_lock`` that also handles DB transactions.
+
+        Returns: DBTxn object
+        """
+        txn = self.db_env.txn_begin()
+        try:
+            with _exclusive_lock(self._lock_path('blobs', digest)):
+                yield txn
+        except:
+            txn.abort()
+            raise
+        else:
+            txn.commit()
 
 
 _BUFFER_SIZE = 64 * 1024
