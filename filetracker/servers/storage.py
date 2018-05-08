@@ -233,9 +233,9 @@ def _exclusive_lock(path):
     """A simple wrapper for fcntl exclusive lock."""
     _create_file_dirs(path)
     fd = os.open(path, os.O_WRONLY | os.O_CREAT, 0o600)
-    fcntl.flock(fd, fcntl.LOCK_EX)
 
     try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
         yield
     finally:
         fcntl.flock(fd, fcntl.LOCK_UN)
