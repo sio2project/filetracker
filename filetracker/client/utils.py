@@ -1,7 +1,6 @@
 """Common routines for client."""
 
 import errno
-import hashlib
 import os
 import shutil
 
@@ -52,24 +51,9 @@ def _check_name(name, allow_version=True):
         raise ValueError("Invalid Filetracker filename: version not allowed "
                          "in this API call")
 
-
 def _mkdir(name):
     try:
         os.makedirs(name, 0o700)
     except OSError as e:
         if e.errno != errno.EEXIST:
             raise
-
-
-def _compute_checksum(filename):
-    """Compute a checksum of a file
-       Implementation like in https://stackoverflow.com/a/22058673
-    """
-    sha = hashlib.sha256()
-    with open(filename, 'rb') as f:
-        while True:
-            data = f.read(65536)
-            if not data:
-                break
-            sha.update(data)
-    return sha.hexdigest()

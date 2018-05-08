@@ -35,11 +35,8 @@ class DataStore(object):
         """
         raise NotImplementedError
 
-    def add_file(self, name, filename, compress_hint=True):
+    def add_file(self, name, filename):
         """Saves the actual file in the store.
-
-           ``compress_hint`` suggests whether the file should be compressed
-           before transfer
 
            Works like :meth:`add_stream`, but ``filename`` is the name of
            an existing file in the filesystem.

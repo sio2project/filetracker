@@ -2,20 +2,15 @@
 
 import email.utils
 import functools
-import gzip
 import logging
-import shutil
 import time
-import tempfile
 
 import requests
 from six.moves.urllib.request import pathname2url
-from six.moves.urllib.parse import urlencode
 
 from filetracker.client import FiletrackerError
 from filetracker.client.data_store import DataStore
-from filetracker.client.utils import (split_name, versioned_name, _check_name,
-                                      _compute_checksum)
+from filetracker.client.utils import split_name, versioned_name, _check_name
 
 logger = logging.getLogger('filetracker')
 
@@ -73,52 +68,17 @@ class RemoteDataStore(DataStore):
         raise RuntimeError("RemoteDataStore does not support streaming "
                            "uploads")
 
-    def _encode_url_params(self, version):
-        url_params = {
-            'last_modified': email.utils.formatdate(version)
-        }
-        return urlencode(url_params)
-
-    def _put_file(self, url, version, f, headers):
-        response = requests.put(url + "?" + self._encode_url_params(version),
-                                data=f, headers=headers)
-        response.raise_for_status()
-        return response
-
     @_report_timing('RemoteDataStore.add_file')
     @_verbose_http_errors
-    def add_file(self, name, filename, compress_hint=True):
+    def add_file(self, name, filename):
         url, version = self._parse_name(name)
-
-        sha = _compute_checksum(filename)
-
-        headers = {
-            'SHA256-Checksum': sha
-        }
 
         # Important detail: this upload is streaming.
         # http://docs.python-requests.org/en/latest/user/advanced/#streaming-uploads
-
         with open(filename, 'rb') as f:
-            if compress_hint:
-                # Unfortunately it seems a temporary file is required here.
-                # Our server requires Content-Length to be present, because
-                # some WSGI implementations (among others the one used in
-                # our tests) are not required to support EOF (instead the
-                # user is required to not read beyond content length,
-                # but that cannot be done if we don't know the content
-                # length). As content length is required for the tests to
-                # work, we need to send it, and to be able to compute it we
-                # need to temporarily store the compressed data before
-                # sending. It can be stored in memory or in a temporary file
-                #  and a temporary file seems to be a more suitable choice.
-                with tempfile.TemporaryFile() as tmp:
-                    with gzip.GzipFile(fileobj=tmp, mode='wb') as gz:
-                        shutil.copyfileobj(f, gz)
-                    tmp.seek(0)
-                    response = self._put_file(url, version, tmp, headers)
-            else:
-                response = self._put_file(url, version, f, headers)
+            headers = {'Last-Modified': email.utils.formatdate(version)}
+            response = requests.put(url, data=f, headers=headers)
+            response.raise_for_status()
 
         name, version = split_name(name)
         return versioned_name(name, self._parse_last_modified(response))
@@ -135,9 +95,7 @@ class RemoteDataStore(DataStore):
             raise FiletrackerError("Version %s not available. Server has %s" \
                     % (name, remote_version))
         name, version = split_name(name)
-
-        stream = _FileLikeFromResponse(response)
-        return stream, versioned_name(name, remote_version)
+        return response.raw, versioned_name(name, remote_version)
 
     def exists(self, name):
         url, version = self._parse_name(name)
@@ -169,26 +127,7 @@ class RemoteDataStore(DataStore):
     @_verbose_http_errors
     def delete_file(self, filename):
         url, version = self._parse_name(filename)
-        response = requests.delete(url
-                                   + "?" + self._encode_url_params(version))
+        response = requests.delete(url, headers={
+            'Last-Modified': email.utils.formatdate(version)})
         # SIO-2093
         # response.raise_for_status()
-
-
-class _FileLikeFromResponse(object):
-    def __init__(self, response):
-        self.iter = response.iter_content(chunk_size=16*1024)
-        self.data = b''
-
-    def read(self, size=None):
-        if size is None:
-            # read all remaining data
-            return self.data + b''.join(c for c in self.iter)
-        else:
-            while len(self.data) < size:
-                try:
-                    self.data += next(self.iter)
-                except StopIteration:
-                    break
-            result, self.data = self.data[:size], self.data[size:]
-            return result
