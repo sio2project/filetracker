@@ -3,12 +3,9 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-from __future__ import division
-from __future__ import print_function
 
 import email.utils
 import os.path
-import shutil
 
 from six.moves.urllib.parse import parse_qs
 
@@ -45,16 +42,18 @@ class LocalFileServer(base.Server):
     def parse_query_params(self, environ):
         return parse_qs(environ.get('QUERY_STRING', ''))
 
-
     def handle_PUT(self, environ, start_response):
         path = self._get_path(environ)
         content_length = int(environ.get('CONTENT_LENGTH'))
 
         query_params = self.parse_query_params(environ)
-        last_modified = query_params.get('last_modified')[0]
+        last_modified = query_params.get('last_modified', (None,))[0]
         if last_modified:
             last_modified = email.utils.parsedate_tz(last_modified)
             last_modified = email.utils.mktime_tz(last_modified)
+        else:
+            start_response('400 Bad Request')
+            return [b'last-modified is required']
 
         version = self.storage.store(name=path,
                                      data=environ['wsgi.input'],
@@ -108,10 +107,13 @@ class LocalFileServer(base.Server):
     def handle_DELETE(self, environ, start_response):
         path = self._get_path(environ)
         query_params = self.parse_query_params(environ)
-        last_modified = query_params.get('last_modified')[0]
+        last_modified = query_params.get('last_modified', (None,))[0]
         if last_modified:
             last_modified = email.utils.parsedate_tz(last_modified)
             last_modified = email.utils.mktime_tz(last_modified)
+        else:
+            start_response('400 Bad Request')
+            return [b'last-modified is required']
 
         ret = self.storage.delete(name=path,
                                   version=last_modified)
