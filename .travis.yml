@@ -9,4 +9,6 @@ addons:
       libdb-dev
       lighttpd
 install: pip install tox-travis
-script: tox
+script: tox && tox -e upload_coverage
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
