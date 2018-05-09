@@ -143,7 +143,7 @@ class FileStorage(object):
                     _create_file_dirs(blob_path)
                     if compressed:
                         if temp_file_path:
-                            os.rename(temp_file_path, blob_path)
+                            shutil.move(temp_file_path, blob_path)
                         else:
                             with open(blob_path, 'wb') as blob:
                                 _copy_stream(data, blob, size)
@@ -166,9 +166,11 @@ class FileStorage(object):
                 self.delete(name, version, lock=False)
 
             _create_file_dirs(link_path)
-            os.symlink(blob_path, link_path)
+            rel_blob_path = os.path.relpath(blob_path,
+                                            os.path.dirname(link_path))
+            os.symlink(rel_blob_path, link_path)
 
-            os.utime(link_path, (version, version))
+            lutime(link_path, version)
             return version
 
     def delete(self, name, version, lock=True):
@@ -343,3 +345,10 @@ def _makedirs(path):
     except OSError as e:
         if e.errno != errno.EEXIST:
             raise
+
+
+def lutime(path, time):
+    if six.PY2:
+        os.system("touch -t {t} {p}".format(t=time, p=path))
+    else:
+        os.utime(path, (time, time), follow_symlinks=False)

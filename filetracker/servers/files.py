@@ -55,10 +55,18 @@ class LocalFileServer(base.Server):
             start_response('400 Bad Request')
             return [b'last-modified is required']
 
+        compressed = False
+        #print(environ)
+        if environ.get('HTTP_CONTENT_ENCODING') == 'gzip':
+            compressed = True
+
+        # TODO HTTP_SHA256_CHECKSUM
+
         version = self.storage.store(name=path,
                                      data=environ['wsgi.input'],
                                      version=last_modified,
-                                     size=content_length)
+                                     size=content_length,
+                                     compressed=compressed)
         start_response('200 OK', [
                 ('Content-Type', 'text/plain'),
                 ('Last-Modified', email.utils.formatdate(version)),

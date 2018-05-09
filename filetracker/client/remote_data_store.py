@@ -117,6 +117,7 @@ class RemoteDataStore(DataStore):
                     with gzip.GzipFile(fileobj=tmp, mode='wb') as gz:
                         shutil.copyfileobj(f, gz)
                     tmp.seek(0)
+                    headers.update({'Content-Encoding': 'gzip'})
                     response = self._put_file(url, version, tmp, headers)
             else:
                 response = self._put_file(url, version, f, headers)
