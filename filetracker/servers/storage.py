@@ -26,11 +26,13 @@ from __future__ import print_function
 
 import contextlib
 import errno
+import email.utils
 import fcntl
 import gzip
 import hashlib
 import os
 import shutil
+import subprocess
 import tempfile
 
 import bsddb3
@@ -215,6 +217,16 @@ class FileStorage(object):
                     raise  # this shouldn't happen if the file really did exist
         return True
 
+    def stored_version(self, name):
+        """
+        Returns the version of file `name` that is currently stored
+        or None if it doesn't exist.
+        """
+        link_path = self._link_path(name)
+        if not _path_exists(link_path):
+            return None
+        return _file_version(link_path)
+
     def _link_path(self, name):
         return os.path.join(self.links_dir, name)
 
@@ -346,9 +358,10 @@ def _makedirs(path):
         if e.errno != errno.EEXIST:
             raise
 
-
 def lutime(path, time):
     if six.PY2:
-        os.system("touch -t {t} {p}".format(t=time, p=path))
+        t = email.utils.formatdate(time)
+        if subprocess.call(["touch", "-c", "-h", "-d", t, path]) != 0:
+            raise RuntimeError
     else:
         os.utime(path, (time, time), follow_symlinks=False)

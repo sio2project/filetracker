@@ -101,7 +101,6 @@ class FileStorageTest(unittest.TestCase):
 
         self.assertEqual(1, storage_version)
 
-    # @unittest.skip("delete() is not implemented yet")  ???
     def test_store_should_overwrite_older_files(self):
         storage = FileStorage(self.temp_dir)
         old_data = BytesIO(b'hello')
@@ -162,3 +161,12 @@ class FileStorageTest(unittest.TestCase):
         storage_path = os.path.join(self.temp_dir, 'links', 'hello.txt')
         with gzip.open(storage_path, 'rb') as f:
             self.assertEqual(f.read(), b'world')
+
+    def test_changing_version_should_not_affect_other_links(self):
+        storage = FileStorage(self.temp_dir)
+        data = BytesIO(b'hello')
+        storage.store('hello.txt', data, version=1)
+        data.seek(0)
+        storage.store('world.txt', data, version=2)
+        self.assertEqual(storage.stored_version('hello.txt'), 1)
+        self.assertEqual(storage.stored_version('world.txt'), 2)

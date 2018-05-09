@@ -56,10 +56,10 @@ class InteractionTest(unittest.TestCase):
         # The remote path looks strange, but with lighttpd one 'files' is
         # stripped away (apparently).
         cache_path = os.path.join(self.cache_dir, 'files', 'put.txt')
-        remote_path = os.path.join(self.server_dir, 'files', 'files', 'put.txt')
+        remote_path = os.path.join(self.server_dir, 'links', 'files', 'put.txt')
 
         self.assertTrue(os.path.exists(cache_path))
-        #self.assertTrue(os.path.exists(remote_path)) # TODO
+        self.assertTrue(os.path.exists(remote_path))
 
         with open(cache_path, 'r') as cf:
             self.assertEqual(cf.read(), 'hello')
@@ -109,7 +109,8 @@ class InteractionTest(unittest.TestCase):
         self.assertEqual(
                 self.client.file_version('/version.txt'), modification_time)
 
-    @unittest.skip("TODO")
+    @unittest.skip("Local and remote file size are not equal, "
+                   "because remote is compressed")
     def test_file_size_should_return_remote_file_size(self):
         src_file = os.path.join(self.temp_dir, 'size.txt')
         with open(src_file, 'wb') as sf:
@@ -118,7 +119,7 @@ class InteractionTest(unittest.TestCase):
         self.client.put_file('/size.txt', src_file)
 
         remote_path = os.path.join(
-                self.server_dir, 'files', 'files', 'size.txt')
+                self.server_dir, 'links', 'files', 'size.txt')
         remote_size = int(os.stat(remote_path).st_size)
 
         self.assertEqual(
