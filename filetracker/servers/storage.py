@@ -128,7 +128,6 @@ class FileStorage(object):
                     digest = _file_digest(temp_file_path)
 
             blob_path = self._blob_path(digest)
-            prefix = digest[0:2]
             
             with self._lock_blob_with_txn(digest) as txn:
                 digest_bytes = digest.encode('utf8')
@@ -201,18 +200,17 @@ class FileStorage(object):
             file_lock = _no_lock()
         with file_lock:
             digest = self._digest_for_link(name)
-            prefix = digest[0:2]
-            with _exclusive_lock(self._lock_path('db', prefix)):
+            with self._lock_blob_with_txn(digest) as txn:
                 os.unlink(link_path)
+                digest_bytes = digest.encode('utf8')
                 try:
-                    key = digest.encode('utf8')
-                    link_count = int(self.db[key])
+                    link_count = int(self.db.get(digest_bytes, 0, txn=txn))
                     if link_count == 1:
-                        # this was the last reference to that blob - remove it
-                        del self.db[key]
+                        self.db.delete(digest_bytes, txn=txn)
                         os.unlink(self._blob_path(digest))
                     else:
-                        self.db[key] = str(link_count - 1).encode('utf8')
+                        new_count = str(link_count - 1).encode('utf8')
+                        self.db.put(digest_bytes, new_count, txn=txn)
                 except KeyError:
                     raise  # this shouldn't happen if the file really did exist
         return True

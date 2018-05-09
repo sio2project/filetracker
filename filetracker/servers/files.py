@@ -6,12 +6,9 @@ from __future__ import print_function
 
 import email.utils
 import os.path
+import zlib
 
 from six.moves.urllib.parse import parse_qs
-
-import email.utils
-
-import os.path
 
 from filetracker.servers import base
 from filetracker.servers.storage import FileStorage
@@ -129,7 +126,8 @@ class LocalFileServer(base.Server):
             start_response('404 Not Found', [('Content-Type', 'text/plain')])
             return []
 
-        start_response('200 OK') # TODO do we want to discern if the file was really deleted?
+        # TODO do we want to discern if the file was really deleted?
+        start_response('200 OK')
         return [b'OK']
 
 
