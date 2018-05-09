@@ -104,8 +104,8 @@ class FileStorage(object):
         """
         with _exclusive_lock(self._lock_path('links', name)):
             link_path = self._link_path(name)
-            if os.path.exists(link_path) and _file_version(link_path) > version:
-                return
+            if _path_exists(link_path) and _file_version(link_path) > version:
+                return _file_version(link_path)
 
             # Path to temporary file that may be created in some cases.
             temp_file_path = None
@@ -159,7 +159,7 @@ class FileStorage(object):
                 if temp_file_path and os.path.exists(temp_file_path):
                     os.unlink(temp_file_path)
 
-            if os.path.exists(link_path):
+            if _path_exists(link_path):
                 # Lend the link lock to delete().
                 # Note that DB lock has to be released in advance, otherwise
                 # deadlock is possible in concurrent scenarios.
@@ -169,9 +169,49 @@ class FileStorage(object):
             os.symlink(blob_path, link_path)
 
             os.utime(link_path, (version, version))
+            return version
 
     def delete(self, name, version, lock=True):
-        pass
+        """Removes a file from the storage.
+
+                   Args:
+                        name: name of the file being deleted.
+                            May contain slashes that are treated as path separators.
+                        version: file "version" that is meant to be deleted
+                            If the file that is stored has newer version than provided,
+                            it will not be deleted.
+                        lock: whether or not to acquire locks
+                            This is for internal use only,
+                            normal users should always leave it set to True.
+                   Returns whether or not the file has been removed
+                   or None if no such file exists.
+                """
+        link_path = self._link_path(name)
+        if not _path_exists(link_path):
+            return None
+        if _file_version(link_path) > version:
+            return False
+        if lock:
+            file_lock = _exclusive_lock(self._lock_path('links', name))
+        else:
+            file_lock = _no_lock()
+        with file_lock:
+            digest = self._digest_for_link(name)
+            prefix = digest[0:2]
+            with _exclusive_lock(self._lock_path('db', prefix)):
+                os.unlink(link_path)
+                try:
+                    key = digest.encode('utf8')
+                    link_count = int(self.db[key])
+                    if link_count == 1:
+                        # this was the last reference to that blob - remove it
+                        del self.db[key]
+                        os.unlink(self._blob_path(digest))
+                    else:
+                        self.db[key] = str(link_count - 1).encode('utf8')
+                except KeyError:
+                    raise  # this shouldn't happen if the file really did exist
+        return True
 
     def _link_path(self, name):
         return os.path.join(self.links_dir, name)
@@ -197,6 +237,12 @@ class FileStorage(object):
             raise
         else:
             txn.commit()
+
+    def _digest_for_link(self, name):
+        link = self._link_path(name)
+        blob_path = os.readlink(link)
+        digest = os.path.basename(blob_path)
+        return digest
 
 
 _BUFFER_SIZE = 64 * 1024
@@ -236,6 +282,12 @@ def _create_file_dirs(file_path):
     _makedirs(dir_name)
 
 
+def _path_exists(path):
+    """Checks if the path exists
+       - is a file, a directory or a symbolic link that may be broken."""
+    return os.path.exists(path) or os.path.islink(path)
+
+
 def _file_digest(source):
     """Calculates SHA256 digest of a file.
 
@@ -260,7 +312,7 @@ def _file_digest(source):
 
 
 def _file_version(path):
-    return os.stat(path).st_mtime
+    return os.lstat(path).st_mtime
 
 
 @contextlib.contextmanager
@@ -275,6 +327,13 @@ def _exclusive_lock(path):
     finally:
         fcntl.flock(fd, fcntl.LOCK_UN)
         os.close(fd)
+
+
+@contextlib.contextmanager
+def _no_lock():
+    """Does nothing, just runs the code within the `with` statement.
+       Used for conditional locking."""
+    yield
 
 
 def _makedirs(path):
