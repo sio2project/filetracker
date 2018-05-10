@@ -164,7 +164,7 @@ class FileStorage(object):
                 # Lend the link lock to delete().
                 # Note that DB lock has to be released in advance, otherwise
                 # deadlock is possible in concurrent scenarios.
-                self.delete(name, version, lock=False)
+                self.delete(name, version, _lock=False)
 
             _create_file_dirs(link_path)
             rel_blob_path = os.path.relpath(blob_path,
@@ -174,45 +174,44 @@ class FileStorage(object):
             lutime(link_path, version)
             return version
 
-    def delete(self, name, version, lock=True):
+    def delete(self, name, version, _lock=True):
         """Removes a file from the storage.
 
-                   Args:
-                        name: name of the file being deleted.
-                            May contain slashes that are treated as path separators.
-                        version: file "version" that is meant to be deleted
-                            If the file that is stored has newer version than provided,
-                            it will not be deleted.
-                        lock: whether or not to acquire locks
-                            This is for internal use only,
-                            normal users should always leave it set to True.
-                   Returns whether or not the file has been removed
-                   or None if no such file exists.
-                """
+        Args:
+             name: name of the file being deleted.
+                 May contain slashes that are treated as path separators.
+             version: file "version" that is meant to be deleted
+                 If the file that is stored has newer version than provided,
+                 it will not be deleted.
+             lock: whether or not to acquire locks
+                 This is for internal use only,
+                 normal users should always leave it set to True.
+        Returns whether or not the file has been deleted.
+        """
         link_path = self._link_path(name)
-        if not _path_exists(link_path):
-            return None
-        if _file_version(link_path) > version:
-            return False
-        if lock:
+        if _lock:
             file_lock = _exclusive_lock(self._lock_path('links', name))
         else:
             file_lock = _no_lock()
         with file_lock:
+            if not _path_exists(link_path):
+                raise FileNotFoundError
+            if _file_version(link_path) > version:
+                return False
             digest = self._digest_for_link(name)
             with self._lock_blob_with_txn(digest) as txn:
                 os.unlink(link_path)
                 digest_bytes = digest.encode('utf8')
-                try:
-                    link_count = int(self.db.get(digest_bytes, 0, txn=txn))
-                    if link_count == 1:
-                        self.db.delete(digest_bytes, txn=txn)
-                        os.unlink(self._blob_path(digest))
-                    else:
-                        new_count = str(link_count - 1).encode('utf8')
-                        self.db.put(digest_bytes, new_count, txn=txn)
-                except KeyError:
-                    raise  # this shouldn't happen if the file really did exist
+                link_count = self.db.get(digest_bytes, txn=txn)
+                if link_count is None:
+                    raise RuntimeError("File exists but has no key in db")
+                link_count = int(link_count)
+                if link_count == 1:
+                    self.db.delete(digest_bytes, txn=txn)
+                    os.unlink(self._blob_path(digest))
+                else:
+                    new_count = str(link_count - 1).encode('utf8')
+                    self.db.put(digest_bytes, new_count, txn=txn)
         return True
 
     def stored_version(self, name):
@@ -364,3 +363,4 @@ def lutime(path, time):
             raise RuntimeError
     else:
         os.utime(path, (time, time), follow_symlinks=False)
+
