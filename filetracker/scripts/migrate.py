@@ -12,12 +12,10 @@ from __future__ import division
 from __future__ import print_function
 
 import argparse
-import contextlib
 import os
 
-import progressbar
-
 from filetracker.client import Client
+from filetracker.scripts import progress_bar
 
 # Value used for aligning printed action names
 _ACTION_LENGTH = 25
@@ -41,13 +39,14 @@ def main():
     total_size = 0
 
     size_widgets = [
-            ' [', progressbar.Timer(format='Time: %(elapsed)s'), '] ',
+            ' [', progress_bar.ShortTimer(), '] ',
             ' Calculating file size '.ljust(_ACTION_LENGTH),
-            ' ', progressbar.DataSize(), ' ',
-            progressbar.BouncingBar(),
+            ' ', progress_bar.DataSize(), ' ',
+            progress_bar.BouncingBar(),
     ]
 
-    with _conditional_bar(show=not silent, widgets=size_widgets) as bar:
+    with progress_bar.conditional(show=not silent,
+                                  widgets=size_widgets) as bar:
         for cur_dir, _, files in os.walk(root):
             for file_name in files:
                 total_size += os.path.getsize(os.path.join(cur_dir, file_name))
@@ -55,19 +54,19 @@ def main():
                     bar.update(total_size)
 
     upload_widgets = [
-            ' [', progressbar.Timer(format='Time: %(elapsed)s'), '] ',
+            ' [', progress_bar.ShortTimer(), '] ',
             ' Uploading files '.ljust(_ACTION_LENGTH),
-            ' ', progressbar.DataSize(), ' ',
-            progressbar.Bar(),
-            ' ', progressbar.Percentage(), ' ',
-            ' (', progressbar.AdaptiveETA(), ') ',
+            ' ', progress_bar.DataSize(), ' ',
+            progress_bar.Bar(),
+            ' ', progress_bar.Percentage(), ' ',
+            ' (', progress_bar.AdaptiveETA(), ') ',
     ]
 
     processed_size = 0
 
-    with _conditional_bar(show=not silent,
-                          max_value=total_size,
-                          widgets=upload_widgets) as bar:
+    with progress_bar.conditional(show=not silent,
+                                  max_value=total_size,
+                                  widgets=upload_widgets) as bar:
         for cur_dir, _, files in os.walk(root):
             for file_name in files:
                 file_path = os.path.join(cur_dir, file_name)
@@ -84,16 +83,6 @@ def main():
                 processed_size += file_size
                 if bar:
                     bar.update(processed_size)
-
-
-@contextlib.contextmanager
-def _conditional_bar(show, **kwargs):
-    """A wrapper for ProgressBar context manager that accepts condition."""
-    if show:
-        with progressbar.ProgressBar(**kwargs) as bar:
-            yield bar
-    else:
-        yield None
 
 
 if __name__ == '__main__':
