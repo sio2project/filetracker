@@ -53,17 +53,17 @@ class LocalFileServer(base.Server):
             return [b'last-modified is required']
 
         compressed = False
-        #print(environ)
         if environ.get('HTTP_CONTENT_ENCODING') == 'gzip':
             compressed = True
 
-        # TODO HTTP_SHA256_CHECKSUM
+        digest = environ.get('HTTP_SHA256_CHECKSUM', None)
 
         version = self.storage.store(name=path,
                                      data=environ['wsgi.input'],
                                      version=last_modified,
                                      size=content_length,
-                                     compressed=compressed)
+                                     compressed=compressed,
+                                     digest=digest)
         start_response('200 OK', [
                 ('Content-Type', 'text/plain'),
                 ('Last-Modified', email.utils.formatdate(version)),
@@ -126,7 +126,6 @@ class LocalFileServer(base.Server):
             start_response('404 Not Found', [('Content-Type', 'text/plain')])
             return []
 
-        # TODO do we want to discern if the file was really deleted?
         start_response('200 OK')
         return [b'OK']
 
