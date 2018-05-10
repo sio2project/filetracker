@@ -13,7 +13,7 @@ import unittest
 from wsgiref.simple_server import make_server
 
 from filetracker.client import Client, FiletrackerError
-from filetracker.servers.files import LocalFileServer
+from filetracker.servers.files import FileTrackerServer
 
 _TEST_PORT_NUMBER = 45735
 
@@ -25,7 +25,7 @@ class InteractionTest(unittest.TestCase):
         cls.server_dir = tempfile.mkdtemp()
         cls.temp_dir = tempfile.mkdtemp()
 
-        cls.server = LocalFileServer(cls.server_dir)
+        cls.server = FileTrackerServer(cls.server_dir)
         cls.server_pid = _fork_to_server(cls.server)
 
         cls.client = Client(
