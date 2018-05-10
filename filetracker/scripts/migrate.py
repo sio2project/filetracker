@@ -50,8 +50,7 @@ def main():
         for cur_dir, _, files in os.walk(root):
             for file_name in files:
                 total_size += os.path.getsize(os.path.join(cur_dir, file_name))
-                if bar:
-                    bar.update(total_size)
+                bar.update(total_size)
 
     upload_widgets = [
             ' [', progress_bar.ShortTimer(), '] ',
@@ -81,8 +80,7 @@ def main():
                 client.put_file(remote_name, file_path, to_local_store=False)
 
                 processed_size += file_size
-                if bar:
-                    bar.update(processed_size)
+                bar.update(processed_size)
 
 
 if __name__ == '__main__':

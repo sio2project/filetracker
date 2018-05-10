@@ -37,7 +37,7 @@ def main():
     args = parser.parse_args()
     root, silent = args.root, args.silent
 
-    check_storage_format(root)
+    ensure_storage_format(root)
 
     # Create a FileStorage object to use the same db settings as usual
     file_storage = FileStorage(root)
@@ -77,7 +77,6 @@ def main():
 
                 processed_links += 1
                 bar.update(processed_links)
-                import time; time.sleep(0.2)
 
     for digest, link_count in six.iteritems(blob_links):
         db.put(digest.encode('utf8'), str(link_count).encode('utf8'))
@@ -104,11 +103,11 @@ def main():
                 bar.update(processed_blobs)
 
     if not silent:
-        print('Competed, {} broken links and {} broken blobs found.'.format(
+        print('Completed, {} broken links and {} stray blobs found.'.format(
             broken_links, broken_blobs))
 
 
-def check_storage_format(root_dir):
+def ensure_storage_format(root_dir):
     """Checks if the directory looks like a filetracker storage.
     
     Exits with error if it doesn't.

@@ -17,9 +17,19 @@ class ShortTimer(Timer):
 
 @contextlib.contextmanager
 def conditional(show, **kwargs):
-    """A wrapper for ProgressBar context manager that accepts condition."""
+    """A wrapper for ProgressBar context manager that accepts condition.
+
+    Returns:
+        if bar should be shown, an actual bar instance.
+        Otherwise, an object has a no-op update() method
+    """
     if show:
         with progressbar.ProgressBar(**kwargs) as bar:
             yield bar
     else:
-        yield None
+        yield _BarStub()
+
+
+class _BarStub(object):
+    def update(*args, **kwargs):
+        pass
