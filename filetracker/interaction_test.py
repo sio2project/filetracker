@@ -53,10 +53,8 @@ class InteractionTest(unittest.TestCase):
 
         self.client.put_file('/put.txt', temp_file)
 
-        # The remote path looks strange, but with lighttpd one 'files' is
-        # stripped away (apparently).
         cache_path = os.path.join(self.cache_dir, 'files', 'put.txt')
-        remote_path = os.path.join(self.server_dir, 'links', 'files', 'put.txt')
+        remote_path = os.path.join(self.server_dir, 'links', 'put.txt')
 
         self.assertTrue(os.path.exists(cache_path))
         self.assertTrue(os.path.exists(remote_path))
@@ -119,7 +117,7 @@ class InteractionTest(unittest.TestCase):
         self.client.put_file('/size.txt', src_file)
 
         remote_path = os.path.join(
-                self.server_dir, 'links', 'files', 'size.txt')
+                self.server_dir, 'links', 'size.txt')
         remote_size = int(os.stat(remote_path).st_size)
 
         self.assertEqual(

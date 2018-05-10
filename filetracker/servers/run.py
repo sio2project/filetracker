@@ -47,7 +47,10 @@ def main(args=None):
     if not options.dir:
         options.dir = os.environ['FILETRACKER_DIR']
 
-    docroot = os.path.abspath(options.dir)
+    filetracker_dir = os.path.abspath(options.dir)
+    if not os.path.exists(filetracker_dir):
+        os.makedirs(filetracker_dir, 0o700)
+    docroot = os.path.join(filetracker_dir, 'links')
     if not os.path.exists(docroot):
         os.makedirs(docroot, 0o700)
 
@@ -66,20 +69,23 @@ def main(args=None):
             mimetype.assign = (
                 "" => "application/octet-stream"
             )
-            setenv.add-response-header = ( "Content-Encoding" => "gzip" )
             $HTTP["request-method"] !~ "^(GET|HEAD)" {
                 fastcgi.server += (
-                  "/files" =>
+                  "" =>
                   (( "bin-path" => "%(interpreter)s %(files_script)s",
                      "bin-environment" => (
-                       "FILETRACKER_DIR" => "%(docroot)s"
+                       "FILETRACKER_DIR" => "%(filetracker_dir)s"
                      ),
                      "socket" => "%(tempdir)s/filetracker-files.%(pid)d",
                      "check-local" => "disable"
                   ))
                 )
             }
+            $HTTP["request-method"] =~ "^(GET|HEAD)" {
+                setenv.add-response-header = ( "Content-Encoding" => "gzip" )   
+            }
         """ % dict(
+            filetracker_dir=filetracker_dir,
             docroot=docroot,
             port=options.port,
             listen_on=options.listen_on,

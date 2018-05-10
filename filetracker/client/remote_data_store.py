@@ -55,7 +55,7 @@ class RemoteDataStore(DataStore):
     """Data store which uses a remote filetracker server."""
 
     def __init__(self, base_url):
-        self.base_url = base_url + '/files'
+        self.base_url = base_url
 
     def _parse_name(self, name):
         _check_name(name)
