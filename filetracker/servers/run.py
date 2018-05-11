@@ -13,7 +13,7 @@ import signal
 
 import filetracker.servers.files
 import filetracker.servers.base
-from filetracker.servers.migration import MigrationFileTrackerServer
+from filetracker.servers.migration import MigrationFiletrackerServer
 
 # Clients may use this as a sensible default port to connect to.
 DEFAULT_PORT = 9999
@@ -41,7 +41,7 @@ def main(args=None):
     parser.add_option('--lighttpd-bin', dest='lighttpd_bin',
             default='lighttpd',
             help="Specify the lighttpd binary to use")
-    parser.add_option('--remote-url', dest='remote_url',
+    parser.add_option('--fallback-url', dest='fallback_url',
             default=None,
             help="Turns on migration mode "
                  "and redirects requests to nonexistent files to the remote")
@@ -59,7 +59,7 @@ def main(args=None):
     if not os.path.exists(docroot):
         os.makedirs(docroot, 0o700)
 
-    if options.remote_url is not None:
+    if options.fallback_url is not None:
         run_migration_server(options)
         os.exit(0)
 
@@ -153,7 +153,7 @@ def main(args=None):
 
 
 def run_migration_server(options):
-    server = MigrationFileTrackerServer(options.remote_url, options.dir)
+    server = MigrationFiletrackerServer(options.fallback_url, options.dir)
     filetracker.servers.base.start_standalone(server, options.port)
 
 
