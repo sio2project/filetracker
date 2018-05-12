@@ -95,33 +95,19 @@ class InteractionTest(unittest.TestCase):
         f, _ = self.client.get_stream('/streams.txt')
         self.assertEqual(f.read(), b'hello streams')
 
-    def test_file_version_should_return_modification_time(self):
+    def test_file_version_should_be_set_to_current_time_on_upload(self):
         src_file = os.path.join(self.temp_dir, 'version.txt')
         with open(src_file, 'wb') as sf:
             sf.write(b'hello version')
+        os.utime(src_file, (1, 1))
 
+        pre_upload = int(time.time())
         self.client.put_file('/version.txt', src_file)
+        post_upload = int(time.time())
 
-        modification_time = int(os.stat(src_file).st_mtime)
-
-        self.assertEqual(
-                self.client.file_version('/version.txt'), modification_time)
-
-    @unittest.skip("Local and remote file size are not equal, "
-                   "because remote is compressed")
-    def test_file_size_should_return_remote_file_size(self):
-        src_file = os.path.join(self.temp_dir, 'size.txt')
-        with open(src_file, 'wb') as sf:
-            sf.write(b'hello size')
-
-        self.client.put_file('/size.txt', src_file)
-
-        remote_path = os.path.join(
-                self.server_dir, 'links', 'size.txt')
-        remote_size = int(os.stat(remote_path).st_size)
-
-        self.assertEqual(
-                self.client.file_size('/size.txt'), remote_size)
+        version = self.client.file_version('/version.txt')
+        self.assertNotEqual(version, 1)
+        self.assertTrue(pre_upload <= version <= post_upload)
 
     def test_put_older_should_fail(self):
         """This test assumes file version is stored in mtime.
