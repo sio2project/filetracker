@@ -128,7 +128,7 @@ class FileStorage(object):
                     digest = _file_digest(temp_file_path)
 
             blob_path = self._blob_path(digest)
-
+            
             with self._lock_blob_with_txn(digest) as txn:
                 digest_bytes = digest.encode('utf8')
                 try:
@@ -359,10 +359,8 @@ def _makedirs(path):
 
 def lutime(path, time):
     if six.PY2:
-        # In Python 2 utime always follows symlinks
         t = email.utils.formatdate(time)
-        if subprocess.call(['touch', '-c', '-h', '-d', t, path]) != 0:
+        if subprocess.call(["touch", "-c", "-h", "-d", t, path]) != 0:
             raise RuntimeError
     else:
         os.utime(path, (time, time), follow_symlinks=False)
-
