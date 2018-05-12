@@ -95,17 +95,19 @@ class InteractionTest(unittest.TestCase):
         f, _ = self.client.get_stream('/streams.txt')
         self.assertEqual(f.read(), b'hello streams')
 
-    def test_file_version_should_return_modification_time(self):
+    def test_file_version_should_be_set_to_current_time_on_upload(self):
         src_file = os.path.join(self.temp_dir, 'version.txt')
         with open(src_file, 'wb') as sf:
             sf.write(b'hello version')
+        os.utime(src_file, (1,1))  # set mtime to some value in the past
 
+        pre_upload = int(time.time())
         self.client.put_file('/version.txt', src_file)
+        post_upload = int(time.time())
 
-        modification_time = int(os.stat(src_file).st_mtime)
-
-        self.assertEqual(
-                self.client.file_version('/version.txt'), modification_time)
+        version = self.client.file_version('/version.txt')
+        self.assertNotEqual(version, 1)
+        self.assertTrue(pre_upload <= version <= post_upload)
 
     def test_put_older_should_fail(self):
         """This test assumes file version is stored in mtime.
