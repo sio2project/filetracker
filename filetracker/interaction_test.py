@@ -107,22 +107,6 @@ class InteractionTest(unittest.TestCase):
         self.assertEqual(
                 self.client.file_version('/version.txt'), modification_time)
 
-    @unittest.skip("Local and remote file size are not equal, "
-                   "because remote is compressed")
-    def test_file_size_should_return_remote_file_size(self):
-        src_file = os.path.join(self.temp_dir, 'size.txt')
-        with open(src_file, 'wb') as sf:
-            sf.write(b'hello size')
-
-        self.client.put_file('/size.txt', src_file)
-
-        remote_path = os.path.join(
-                self.server_dir, 'links', 'size.txt')
-        remote_size = int(os.stat(remote_path).st_size)
-
-        self.assertEqual(
-                self.client.file_size('/size.txt'), remote_size)
-
     def test_put_older_should_fail(self):
         """This test assumes file version is stored in mtime.
         """
