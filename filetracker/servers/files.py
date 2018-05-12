@@ -10,7 +10,8 @@ import os.path
 from six.moves.urllib.parse import parse_qs
 
 from filetracker.servers import base
-from filetracker.servers.storage import FileStorage
+from filetracker.servers.storage import (FileStorage,
+                                         FiletrackerFileNotFoundError)
 
 
 class LocalFileServer(base.Server):
@@ -114,17 +115,17 @@ class LocalFileServer(base.Server):
             last_modified = email.utils.parsedate_tz(last_modified)
             last_modified = email.utils.mktime_tz(last_modified)
         else:
-            start_response('400 Bad Request')
+            start_response('400 Bad Request', [])
             return [b'last-modified is required']
 
         try:
             self.storage.delete(name=path,
                                 version=last_modified)
-        except FileNotFoundError:
-            start_response('404 Not Found')
+        except FiletrackerFileNotFoundError:
+            start_response('404 Not Found', [])
             return []
 
-        start_response('200 OK')
+        start_response('200 OK', [])
         return [b'OK']
 
 

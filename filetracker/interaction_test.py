@@ -133,6 +133,26 @@ class InteractionTest(unittest.TestCase):
         with self.assertRaises(FiletrackerError):
             self.client.get_stream('/older.txt@1')
 
+    def test_get_nonexistent_should_404(self):
+        with self.assertRaisesRegexp(FiletrackerError, "404"):
+            self.client.get_stream('/nonexistent.txt')
+
+    def test_delete_nonexistent_should_404(self):
+        with self.assertRaisesRegexp(FiletrackerError, "404"):
+            self.client.delete_file('/nonexistent.txt')
+
+    def test_delete_should_remove_file(self):
+        src_file = os.path.join(self.temp_dir, 'del.txt')
+
+        with open(src_file, 'wb') as sf:
+            sf.write(b'test')
+
+        self.client.put_file('/del.txt', src_file)
+        self.client.delete_file('/del.txt')
+
+        with self.assertRaisesRegexp(FiletrackerError, "404"):
+            self.client.get_stream('/del.txt')
+
 
 def _fork_to_server(server):
     """Returns child server process PID."""
@@ -144,3 +164,4 @@ def _fork_to_server(server):
         httpd = make_server('', _TEST_PORT_NUMBER, server)
         print('Serving on port %d' % _TEST_PORT_NUMBER)
         httpd.serve_forever()
+

@@ -39,6 +39,10 @@ import bsddb3
 import six
 
 
+class FiletrackerFileNotFoundError(Exception):
+    pass
+
+
 class FileStorage(object):
     """Manages the whole file storage."""
 
@@ -195,7 +199,7 @@ class FileStorage(object):
             file_lock = _no_lock()
         with file_lock:
             if not _path_exists(link_path):
-                raise FileNotFoundError
+                raise FiletrackerFileNotFoundError
             if _file_version(link_path) > version:
                 return False
             digest = self._digest_for_link(name)
