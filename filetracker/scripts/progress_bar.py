@@ -7,12 +7,11 @@ from __future__ import print_function
 import contextlib
 
 from progressbar import *
-import progressbar
 
 
 class ShortTimer(Timer):
     def __init__(self):
-        super(Timer, self).__init__(format='Time: %(elapsed)s')
+        super(ShortTimer, self).__init__(format='Time: %(elapsed)s')
 
 
 @contextlib.contextmanager
@@ -24,7 +23,7 @@ def conditional(show, **kwargs):
         Otherwise, an object has a no-op update() method
     """
     if show:
-        with progressbar.ProgressBar(**kwargs) as bar:
+        with ProgressBar(**kwargs) as bar:
             yield bar
     else:
         yield _BarStub()

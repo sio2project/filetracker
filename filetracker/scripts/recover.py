@@ -1,14 +1,4 @@
-"""Script for recovering filetracker storage consistency after failures.
-
-This script iterates over all existing links, removing broken ones and
-recalculating blob reference count from scratch, overwriting existing
-values in DB.
-
-It also iterates over blobs and removes blobs that are not linked.
-
-WARNING: this script does not use or respect locks, so DO NOT run
-this while storage is being used by a filetracker server.
-"""
+"""Script for recovering filetracker storage consistency after failures."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -23,13 +13,26 @@ import six
 from filetracker.scripts import progress_bar
 from filetracker.servers.storage import FileStorage
 
+_DESCRIPTION = """
+Restores storage consistency after failures.
+
+
+This script iterates over all existing links, removing broken ones and
+recalculating blob reference count from scratch, overwriting existing
+values in DB.
+
+It also iterates over blobs and removes blobs that are not linked.
+
+WARNING: this script does not use or respect locks, so DO NOT run
+this while storage is being used by a filetracker server.
+"""
+
 # Value used for aligning printed action names
 _ACTION_LENGTH = 25
 
 
 def main():
-    parser = argparse.ArgumentParser(
-            description='Restores storage consistency after failures')
+    parser = argparse.ArgumentParser(description=_DESCRIPTION)
     parser.add_argument('root', help='root directory of filetracker storage')
     parser.add_argument('-s', '--silent', action='store_true',
             help='if set, progress bar is not printed')
@@ -60,6 +63,8 @@ def main():
             for file_name in files:
                 link_path = os.path.join(cur_dir, file_name)
 
+                # In an unlikely case when links/ contains files
+                # that are not links, they are removed.
                 if not os.path.islink(link_path):
                     os.unlink(link_path)
                     broken_links += 1

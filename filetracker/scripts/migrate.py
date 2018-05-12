@@ -1,11 +1,4 @@
-"""Script to upload a file tree to a remote filetracker server.
-
-The intention for this script is to support migration to new filetracker
-servers that change the format of disk storage.
-
-For performing the migration in production, you may also be interested
-in the redirect functionality of the filetracker server.
-"""
+"""Script to upload a file tree to a remote filetracker server."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -21,9 +14,19 @@ from filetracker.scripts import progress_bar
 _ACTION_LENGTH = 25
 
 
+_DESCRIPTION = """
+Uploads all files to a remote filetracker server.
+
+The intention for this script is to support migration to new filetracker
+servers that change the format of disk storage.
+
+Refer to MIGRATING.md for detailed manual for migrating between
+different major filetracker versions.
+"""
+
+
 def main():
-    parser = argparse.ArgumentParser(
-            description='Uploads all files to a remote filetracker server')
+    parser = argparse.ArgumentParser(description=_DESCRIPTION)
     parser.add_argument('files', help='root of the file tree to be uploaded')
     parser.add_argument('url', help='URL of the filetracker server')
     parser.add_argument('-s', '--silent', action='store_true',
