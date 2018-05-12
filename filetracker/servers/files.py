@@ -49,7 +49,7 @@ class LocalFileServer(base.Server):
             last_modified = email.utils.parsedate_tz(last_modified)
             last_modified = email.utils.mktime_tz(last_modified)
         else:
-            start_response('400 Bad Request')
+            start_response('400 Bad Request', [])
             return [b'last-modified is required']
 
         compressed = environ.get('HTTP_CONTENT_ENCODING', None) == 'gzip'
