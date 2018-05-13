@@ -4,21 +4,17 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import contextlib
 from multiprocessing import Process
 import os
 import shutil
 import tempfile
 import time
 import unittest
-from wsgiref.simple_server import make_server
 
 from six import BytesIO
 
 from filetracker.client import Client
-from filetracker.servers.files import LocalFileServer
 from filetracker.servers.run import main as lighttpd_main
-import filetracker.servers.storage
 
 # _CLIENT_WAIT_S and _FILE_SIZE should be picked in a way that the time
 # between spawning a client and this client sending a request is
