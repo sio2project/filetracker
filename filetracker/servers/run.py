@@ -77,7 +77,8 @@ def main(args=None):
                        "FILETRACKER_DIR" => "%(filetracker_dir)s"
                      ),
                      "socket" => "%(tempdir)s/filetracker-files.%(pid)d",
-                     "check-local" => "disable"
+                     "check-local" => "disable",
+                     "fix-root-scriptname" => "enable"
                   ))
                 )
             }
