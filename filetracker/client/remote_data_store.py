@@ -54,7 +54,7 @@ class RemoteDataStore(DataStore):
     """Data store which uses a remote filetracker server."""
 
     def __init__(self, base_url):
-        self.base_url = base_url + '/files'
+        self.base_url = base_url
 
     def _parse_name(self, name):
         _check_name(name)
@@ -116,6 +116,7 @@ class RemoteDataStore(DataStore):
                     with gzip.GzipFile(fileobj=tmp, mode='wb') as gz:
                         shutil.copyfileobj(f, gz)
                     tmp.seek(0)
+                    headers.update({'Content-Encoding': 'gzip'})
                     response = self._put_file(url, version, tmp, headers)
             else:
                 response = self._put_file(url, version, f, headers)
@@ -171,8 +172,7 @@ class RemoteDataStore(DataStore):
         url, version = self._parse_name(filename)
         response = requests.delete(url
                                    + "?" + self._encode_url_params(version))
-        # SIO-2093
-        # response.raise_for_status()
+        response.raise_for_status()
 
 
 class _FileLikeFromResponse(object):

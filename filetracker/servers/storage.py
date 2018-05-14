@@ -26,15 +26,21 @@ from __future__ import print_function
 
 import contextlib
 import errno
+import email.utils
 import fcntl
 import gzip
 import hashlib
 import os
 import shutil
+import subprocess
 import tempfile
 
 import bsddb3
 import six
+
+
+class FiletrackerFileNotFoundError(Exception):
+    pass
 
 
 class FileStorage(object):
@@ -104,8 +110,8 @@ class FileStorage(object):
         """
         with _exclusive_lock(self._lock_path('links', name)):
             link_path = self._link_path(name)
-            if os.path.exists(link_path) and _file_version(link_path) > version:
-                return
+            if _path_exists(link_path) and _file_version(link_path) > version:
+                return _file_version(link_path)
 
             # Path to temporary file that may be created in some cases.
             temp_file_path = None
@@ -126,7 +132,6 @@ class FileStorage(object):
                     digest = _file_digest(temp_file_path)
 
             blob_path = self._blob_path(digest)
-            prefix = digest[0:2]
             
             with self._lock_blob_with_txn(digest) as txn:
                 digest_bytes = digest.encode('utf8')
@@ -143,7 +148,7 @@ class FileStorage(object):
                     _create_file_dirs(blob_path)
                     if compressed:
                         if temp_file_path:
-                            os.rename(temp_file_path, blob_path)
+                            shutil.move(temp_file_path, blob_path)
                         else:
                             with open(blob_path, 'wb') as blob:
                                 _copy_stream(data, blob, size)
@@ -159,19 +164,69 @@ class FileStorage(object):
                 if temp_file_path and os.path.exists(temp_file_path):
                     os.unlink(temp_file_path)
 
-            if os.path.exists(link_path):
+            if _path_exists(link_path):
                 # Lend the link lock to delete().
                 # Note that DB lock has to be released in advance, otherwise
                 # deadlock is possible in concurrent scenarios.
-                self.delete(name, version, lock=False)
+                self.delete(name, version, _lock=False)
 
             _create_file_dirs(link_path)
-            os.symlink(blob_path, link_path)
+            rel_blob_path = os.path.relpath(blob_path,
+                                            os.path.dirname(link_path))
+            os.symlink(rel_blob_path, link_path)
 
-            os.utime(link_path, (version, version))
+            lutime(link_path, version)
+            return version
 
-    def delete(self, name, version, lock=True):
-        pass
+    def delete(self, name, version, _lock=True):
+        """Removes a file from the storage.
+
+        Args:
+             name: name of the file being deleted.
+                 May contain slashes that are treated as path separators.
+             version: file "version" that is meant to be deleted
+                 If the file that is stored has newer version than provided,
+                 it will not be deleted.
+             lock: whether or not to acquire locks
+                 This is for internal use only,
+                 normal users should always leave it set to True.
+        Returns whether or not the file has been deleted.
+        """
+        link_path = self._link_path(name)
+        if _lock:
+            file_lock = _exclusive_lock(self._lock_path('links', name))
+        else:
+            file_lock = _no_lock()
+        with file_lock:
+            if not _path_exists(link_path):
+                raise FiletrackerFileNotFoundError
+            if _file_version(link_path) > version:
+                return False
+            digest = self._digest_for_link(name)
+            with self._lock_blob_with_txn(digest) as txn:
+                os.unlink(link_path)
+                digest_bytes = digest.encode('utf8')
+                link_count = self.db.get(digest_bytes, txn=txn)
+                if link_count is None:
+                    raise RuntimeError("File exists but has no key in db")
+                link_count = int(link_count)
+                if link_count == 1:
+                    self.db.delete(digest_bytes, txn=txn)
+                    os.unlink(self._blob_path(digest))
+                else:
+                    new_count = str(link_count - 1).encode('utf8')
+                    self.db.put(digest_bytes, new_count, txn=txn)
+        return True
+
+    def stored_version(self, name):
+        """
+        Returns the version of file `name` that is currently stored
+        or None if it doesn't exist.
+        """
+        link_path = self._link_path(name)
+        if not _path_exists(link_path):
+            return None
+        return _file_version(link_path)
 
     def _link_path(self, name):
         return os.path.join(self.links_dir, name)
@@ -197,6 +252,12 @@ class FileStorage(object):
             raise
         else:
             txn.commit()
+
+    def _digest_for_link(self, name):
+        link = self._link_path(name)
+        blob_path = os.readlink(link)
+        digest = os.path.basename(blob_path)
+        return digest
 
 
 _BUFFER_SIZE = 64 * 1024
@@ -236,6 +297,12 @@ def _create_file_dirs(file_path):
     _makedirs(dir_name)
 
 
+def _path_exists(path):
+    """Checks if the path exists
+       - is a file, a directory or a symbolic link that may be broken."""
+    return os.path.exists(path) or os.path.islink(path)
+
+
 def _file_digest(source):
     """Calculates SHA256 digest of a file.
 
@@ -260,7 +327,7 @@ def _file_digest(source):
 
 
 def _file_version(path):
-    return os.stat(path).st_mtime
+    return os.lstat(path).st_mtime
 
 
 @contextlib.contextmanager
@@ -277,6 +344,13 @@ def _exclusive_lock(path):
         os.close(fd)
 
 
+@contextlib.contextmanager
+def _no_lock():
+    """Does nothing, just runs the code within the `with` statement.
+       Used for conditional locking."""
+    yield
+
+
 def _makedirs(path):
     """A py2 wrapper for os.makedirs() that simulates exist_ok=True flag."""
     try:
@@ -284,3 +358,13 @@ def _makedirs(path):
     except OSError as e:
         if e.errno != errno.EEXIST:
             raise
+
+
+def lutime(path, time):
+    if six.PY2:
+        t = email.utils.formatdate(time)
+        if subprocess.call(["touch", "-c", "-h", "-d", t, path]) != 0:
+            raise RuntimeError
+    else:
+        os.utime(path, (time, time), follow_symlinks=False)
+

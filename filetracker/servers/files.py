@@ -6,11 +6,12 @@ from __future__ import print_function
 
 import email.utils
 import os.path
-import shutil
 
 from six.moves.urllib.parse import parse_qs
 
 from filetracker.servers import base
+from filetracker.servers.storage import (FileStorage,
+                                         FiletrackerFileNotFoundError)
 
 
 class LocalFileServer(base.Server):
@@ -24,45 +25,46 @@ class LocalFileServer(base.Server):
                         "directory specified either as a constructor argument "
                         "or passed via FILETRACKER_DIR environment variable.")
             dir = os.environ['FILETRACKER_DIR']
-        self.dir = os.path.join(dir, 'files')
+        self.storage = FileStorage(dir)
+        self.dir = self.storage.links_dir
 
     @staticmethod
     def _get_path(environ):
         path = environ['PATH_INFO']
         if '..' in path:
             raise ValueError('Path cannot contain "..".')
-        return path
+        return path.lstrip("/") # strip leading slashes
+        # so that os.path.join works in a reasonable way
 
     def parse_query_params(self, environ):
-        return parse_qs(environ['QUERY_STRING'] or '')
-
+        return parse_qs(environ.get('QUERY_STRING', ''))
 
     def handle_PUT(self, environ, start_response):
-        path = self.dir + self._get_path(environ)
-        dirname = os.path.dirname(path)
-        if not os.path.exists(dirname):
-            os.makedirs(dirname)
-
+        path = self._get_path(environ)
         content_length = int(environ.get('CONTENT_LENGTH'))
 
         query_params = self.parse_query_params(environ)
-        last_modified = query_params.get('last_modified')[0]
+        last_modified = query_params.get('last_modified', (None,))[0]
         if last_modified:
             last_modified = email.utils.parsedate_tz(last_modified)
             last_modified = email.utils.mktime_tz(last_modified)
+        else:
+            start_response('400 Bad Request', [])
+            return [b'last-modified is required']
 
-        if not last_modified or not os.path.exists(path) \
-                or os.stat(path).st_mtime < last_modified:
-            with open(path, 'wb') as f:
-                _copy_stream(environ['wsgi.input'], f, content_length)
+        compressed = environ.get('HTTP_CONTENT_ENCODING', None) == 'gzip'
 
-            if last_modified:
-                os.utime(path, (last_modified, last_modified))
+        digest = environ.get('HTTP_SHA256_CHECKSUM', None)
 
-        st = os.stat(path)
+        version = self.storage.store(name=path,
+                                     data=environ['wsgi.input'],
+                                     version=last_modified,
+                                     size=content_length,
+                                     compressed=compressed,
+                                     digest=digest)
         start_response('200 OK', [
                 ('Content-Type', 'text/plain'),
-                ('Last-Modified', email.utils.formatdate(st.st_mtime)),
+                ('Last-Modified', email.utils.formatdate(version)),
             ])
         return [b'OK']
 
@@ -76,7 +78,7 @@ class LocalFileServer(base.Server):
             yield data
 
     def _file_headers(self, path):
-        st = os.stat(path)
+        st = os.lstat(path)
         return [
                 ('Last-Modified', email.utils.formatdate(st.st_mtime)),
                 ('Content-Type', 'application/octet-stream'),
@@ -89,7 +91,7 @@ class LocalFileServer(base.Server):
         # configure your web server to directly serve files
         # from self.dir instead of going through this code.
         # But the server must generate Last-Modified headers.
-        path = self.dir + self._get_path(environ)
+        path = os.path.join(self.dir, self._get_path(environ))
         if not os.path.isfile(path):
             start_response('404 Not Found', [('Content-Type', 'text/plain')])
             return [('File not found: %s' % path).encode()]
@@ -98,7 +100,7 @@ class LocalFileServer(base.Server):
 
     def handle_HEAD(self, environ, start_response):
         # This is a standard HEAD with nothing fancy.
-        path = self.dir + self._get_path(environ)
+        path = os.path.join(self.dir, self._get_path(environ))
         if not os.path.isfile(path):
             start_response('404 Not Found', [('Content-Type', 'text/plain')])
             return [('File not found: %s' % path).encode()]
@@ -106,10 +108,25 @@ class LocalFileServer(base.Server):
         return []
 
     def handle_DELETE(self, environ, start_response):
-        # SIO-2093
-        path = self.dir + self._get_path(environ)
-        start_response('200 OK', self._file_headers(path))
-        return []
+        path = self._get_path(environ)
+        query_params = self.parse_query_params(environ)
+        last_modified = query_params.get('last_modified', (None,))[0]
+        if last_modified:
+            last_modified = email.utils.parsedate_tz(last_modified)
+            last_modified = email.utils.mktime_tz(last_modified)
+        else:
+            start_response('400 Bad Request', [])
+            return [b'last-modified is required']
+
+        try:
+            self.storage.delete(name=path,
+                                version=last_modified)
+        except FiletrackerFileNotFoundError:
+            start_response('404 Not Found', [])
+            return []
+
+        start_response('200 OK', [])
+        return [b'OK']
 
 
 _BUFFER_SIZE = 64 * 1024
