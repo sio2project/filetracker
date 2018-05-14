@@ -4,16 +4,15 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from multiprocessing import Process
 import os
 import shutil
-import signal
 import tempfile
 import time
 import unittest
-from wsgiref.simple_server import make_server
 
 from filetracker.client import Client, FiletrackerError
-from filetracker.servers.files import LocalFileServer
+from filetracker.servers.run import main as lighttpd_main
 
 _TEST_PORT_NUMBER = 45735
 
@@ -25,8 +24,10 @@ class InteractionTest(unittest.TestCase):
         cls.server_dir = tempfile.mkdtemp()
         cls.temp_dir = tempfile.mkdtemp()
 
-        cls.server = LocalFileServer(cls.server_dir)
-        cls.server_pid = _fork_to_server(cls.server)
+        cls.server_process = Process(
+                target=_start_server, args=(cls.server_dir,))
+        cls.server_process.start()
+        time.sleep(1)   # give server some time to start
 
         cls.client = Client(
                 cache_dir=cls.cache_dir,
@@ -34,7 +35,7 @@ class InteractionTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        os.kill(cls.server_pid, signal.SIGKILL)
+        cls.server_process.terminate()
         shutil.rmtree(cls.cache_dir)
         shutil.rmtree(cls.server_dir)
         shutil.rmtree(cls.temp_dir)
@@ -109,9 +110,22 @@ class InteractionTest(unittest.TestCase):
         self.assertNotEqual(version, 1)
         self.assertTrue(pre_upload <= version <= post_upload)
 
+    def test_every_link_should_have_independent_version(self):
+        src_file = os.path.join(self.temp_dir, 'foo.txt')
+        with open(src_file, 'wb') as sf:
+            sf.write(b'hello foo')
+
+        self.client.put_file('/foo_a.txt', src_file)
+        time.sleep(1)
+        self.client.put_file('/foo_b.txt', src_file)
+
+        version_a = self.client.file_version('/foo_a.txt')
+        version_b = self.client.file_version('/foo_b.txt')
+
+        self.assertNotEqual(version_a, version_b)
+
     def test_put_older_should_fail(self):
-        """This test assumes file version is stored in mtime.
-        """
+        """This test assumes file version is stored in mtime."""
         src_file = os.path.join(self.temp_dir, 'older.txt')
         with open(src_file, 'wb') as sf:
             sf.write(b'version 1')
@@ -154,14 +168,5 @@ class InteractionTest(unittest.TestCase):
             self.client.get_stream('/del.txt')
 
 
-def _fork_to_server(server):
-    """Returns child server process PID."""
-    pid = os.fork()
-    if pid > 0:
-        time.sleep(1)   # give server some time to start
-        return pid
-    else:
-        httpd = make_server('', _TEST_PORT_NUMBER, server)
-        print('Serving on port %d' % _TEST_PORT_NUMBER)
-        httpd.serve_forever()
-
+def _start_server(server_dir):
+    lighttpd_main(['-p', str(_TEST_PORT_NUMBER), '-d', server_dir, '-D'])
