@@ -97,11 +97,10 @@ class FileStorageTest(unittest.TestCase):
         storage.store('hello.txt', data, version=1)
 
         storage_path = os.path.join(self.temp_dir, 'links', 'hello.txt')
-        storage_version = os.stat(storage_path).st_mtime
+        storage_version = os.lstat(storage_path).st_mtime
 
         self.assertEqual(1, storage_version)
 
-    @unittest.skip("delete() is not implemented yet")
     def test_store_should_overwrite_older_files(self):
         storage = FileStorage(self.temp_dir)
         old_data = BytesIO(b'hello')
@@ -125,3 +124,49 @@ class FileStorageTest(unittest.TestCase):
         storage_path = os.path.join(self.temp_dir, 'links', 'hello.txt')
         with gzip.open(storage_path, 'rb') as f:
             self.assertEqual(f.read(), b'world')
+
+    def test_removing_one_reference_should_not_break_others(self):
+        storage = FileStorage(self.temp_dir)
+        data = BytesIO(b'hello')
+
+        storage.store('hello.txt', data, version=1)
+
+        data.seek(0)
+        storage.store('world.txt', data, version=1)
+        storage.delete('hello.txt', version=1)
+
+        path = os.path.join(self.temp_dir, 'links', 'world.txt')
+
+        with gzip.open(path, 'rb') as f:
+            self.assertEqual(f.read(), b'hello')
+
+    def test_blob_should_be_deleted_with_the_last_reference(self):
+        storage = FileStorage(self.temp_dir)
+        data = BytesIO(b'hello')
+
+        storage.store('hello.txt', data, version=1)
+        storage.delete('hello.txt', version=1)
+
+        # check that blobs directory has no files in it
+        # (empty directories are allowed)
+        for _, _, files in os.walk(storage.blobs_dir):
+            self.assertEqual(len(files), 0)
+
+    def test_deleting_older_version_should_have_no_effect(self):
+        storage = FileStorage(self.temp_dir)
+
+        storage.store('hello.txt', BytesIO(b'world'), version=2)
+        storage.delete('hello.txt', version=1)
+
+        storage_path = os.path.join(self.temp_dir, 'links', 'hello.txt')
+        with gzip.open(storage_path, 'rb') as f:
+            self.assertEqual(f.read(), b'world')
+
+    def test_changing_version_should_not_affect_other_links(self):
+        storage = FileStorage(self.temp_dir)
+        data = BytesIO(b'hello')
+        storage.store('hello.txt', data, version=1)
+        data.seek(0)
+        storage.store('world.txt', data, version=2)
+        self.assertEqual(storage.stored_version('hello.txt'), 1)
+        self.assertEqual(storage.stored_version('world.txt'), 2)
