@@ -6,12 +6,12 @@ from __future__ import print_function
 
 import email.utils
 import os.path
-import zlib
 
 from six.moves.urllib.parse import parse_qs
 
 from filetracker.servers import base
-from filetracker.servers.storage import FileStorage
+from filetracker.servers.storage import (FileStorage,
+                                         FiletrackerFileNotFoundError)
 
 
 class FiletrackerServer(base.Server):
@@ -49,12 +49,10 @@ class FiletrackerServer(base.Server):
             last_modified = email.utils.parsedate_tz(last_modified)
             last_modified = email.utils.mktime_tz(last_modified)
         else:
-            start_response('400 Bad Request')
+            start_response('400 Bad Request', [])
             return [b'last-modified is required']
 
-        compressed = False
-        if environ.get('HTTP_CONTENT_ENCODING') == 'gzip':
-            compressed = True
+        compressed = environ.get('HTTP_CONTENT_ENCODING', None) == 'gzip'
 
         digest = environ.get('HTTP_SHA256_CHECKSUM', None)
 
@@ -117,16 +115,17 @@ class FiletrackerServer(base.Server):
             last_modified = email.utils.parsedate_tz(last_modified)
             last_modified = email.utils.mktime_tz(last_modified)
         else:
-            start_response('400 Bad Request')
+            start_response('400 Bad Request', [])
             return [b'last-modified is required']
 
-        ret = self.storage.delete(name=path,
-                                  version=last_modified)
-        if ret is None:
-            start_response('404 Not Found', [('Content-Type', 'text/plain')])
+        try:
+            self.storage.delete(name=path,
+                                version=last_modified)
+        except FiletrackerFileNotFoundError:
+            start_response('404 Not Found', [])
             return []
 
-        start_response('200 OK')
+        start_response('200 OK', [])
         return [b'OK']
 
 

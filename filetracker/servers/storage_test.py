@@ -152,7 +152,7 @@ class FileStorageTest(unittest.TestCase):
         for _, _, files in os.walk(storage.blobs_dir):
             self.assertEqual(len(files), 0)
 
-    def test_deleting_older_version(self):
+    def test_deleting_older_version_should_have_no_effect(self):
         storage = FileStorage(self.temp_dir)
 
         storage.store('hello.txt', BytesIO(b'world'), version=2)

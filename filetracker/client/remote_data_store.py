@@ -173,7 +173,6 @@ class RemoteDataStore(DataStore):
         url, version = self._parse_name(filename)
         response = requests.delete(url
                                    + "?" + self._encode_url_params(version))
-        # SIO-2093 (TODO check if nothing breaks in oioioi)
         response.raise_for_status()
 
 
