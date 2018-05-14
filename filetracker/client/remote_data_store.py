@@ -1,5 +1,7 @@
 """DataStore implementation that interacts with a filetracker server."""
 
+from __future__ import print_function
+
 import email.utils
 import functools
 import gzip
@@ -19,6 +21,33 @@ from filetracker.utils import (split_name, versioned_name, check_name,
                                file_digest)
 
 logger = logging.getLogger('filetracker')
+
+
+# Protocol versions supported by this client.
+_SUPPORTED_VERSIONS = {1, 2}
+
+# Capabilities defined by the protocol:
+
+# 'Last-Modified' header should be sent instead of 'last-modified'.
+# query parameter
+SERVER_REQUIRES_VERSION_HEADER = 1
+
+# Server accepts compressed streams.
+SERVER_ACCEPTS_GZIP = 2
+
+# SHA256 headers are used by the server.
+SERVER_ACCEPTS_SHA256_DIGEST = 3
+
+
+_PROTOCOL_CAPABILITIES = {
+    1: [
+        SERVER_REQUIRES_VERSION_HEADER,
+    ],
+    2: [
+        SERVER_ACCEPTS_GZIP,
+        SERVER_ACCEPTS_SHA256_DIGEST
+    ]
+}
 
 
 def _verbose_http_errors(fn):
@@ -74,24 +103,15 @@ class RemoteDataStore(DataStore):
         raise RuntimeError("RemoteDataStore does not support streaming "
                            "uploads")
 
-    def _encode_url_params(self, version):
-        url_params = {
-            'last_modified': email.utils.formatdate(version)
-        }
-        return urlencode(url_params)
-
-    def _put_file(self, url, version, f, headers):
-        response = requests.put(url + "?" + self._encode_url_params(version),
-                                data=f, headers=headers)
-        response.raise_for_status()
-        return response
-
     @_report_timing('RemoteDataStore.add_file')
     @_verbose_http_errors
     def add_file(self, name, filename, compress_hint=True):
         url, version = self._parse_name(name)
 
-        sha = file_digest(filename)
+        if self._has_capability(SERVER_ACCEPTS_SHA256_DIGEST):
+            sha = file_digest(filename)
+        else:
+            sha = ''
 
         headers = {
             'SHA256-Checksum': sha
@@ -101,7 +121,8 @@ class RemoteDataStore(DataStore):
         # http://docs.python-requests.org/en/latest/user/advanced/#streaming-uploads
 
         with open(filename, 'rb') as f:
-            if compress_hint:
+            if (compress_hint
+                    and self._has_capability(SERVER_ACCEPTS_GZIP)):
                 # Unfortunately it seems a temporary file is required here.
                 # Our server requires Content-Length to be present, because
                 # some WSGI implementations (among others the one used in
@@ -125,6 +146,12 @@ class RemoteDataStore(DataStore):
 
         name, version = split_name(name)
         return versioned_name(name, self._parse_last_modified(response))
+
+    def _put_file(self, url, version, f, headers):
+        url, headers = self._add_version_to_request(url, headers, version)
+        response = requests.put(url, data=f, headers=headers)
+        response.raise_for_status()
+        return response
 
     @_verbose_http_errors
     def get_stream(self, name):
@@ -164,6 +191,7 @@ class RemoteDataStore(DataStore):
 
     @_verbose_http_errors
     def file_size(self, name):
+        # TODO remote version should be checked as in get_file
         url, version = self._parse_name(name)
         response = requests.head(url, allow_redirects=True)
         response.raise_for_status()
@@ -172,9 +200,63 @@ class RemoteDataStore(DataStore):
     @_verbose_http_errors
     def delete_file(self, filename):
         url, version = self._parse_name(filename)
-        response = requests.delete(url
-                                   + "?" + self._encode_url_params(version))
+        url, headers = self._add_version_to_request(url, {}, version)
+        response = requests.delete(url, headers=headers)
         response.raise_for_status()
+
+    def _add_version_to_request(self, url, headers, version):
+        """Adds version to either url or headers, depending on protocol."""
+        if self._has_capability(SERVER_REQUIRES_VERSION_HEADER):
+            new_headers = headers.copy()
+            new_headers['Last-Modified'] = email.utils.formatdate(version)
+            return url, new_headers
+        else:
+            url_params = {
+                'last_modified': email.utils.formatdate(version)
+            }
+            new_url = url + "?" + urlencode(url_params)
+            return new_url, headers
+
+    def _protocol_version(self):
+        """Returns the protocol version that should be used.
+
+        If the version wasn't established yet, asks the server what
+        versions it supports and picks the highest one.
+        """
+        if hasattr(self, '_protocol_ver'):
+            return self._protocol_ver
+
+        response = requests.get(self.base_url + '/version/')
+
+        if response.status_code == 404:
+            server_versions = {1}
+        elif response.status_code == 200:
+            server_versions = set(response.json()['protocol_versions'])
+            if not server_versions:
+                raise FiletrackerError(
+                        'Server hasn\'t reported any supported protocols')
+        else:
+            response.raise_for_status()
+
+        common_versions = _SUPPORTED_VERSIONS.intersection(server_versions)
+        if not common_versions:
+            raise FiletrackerError(
+                    'Couldn\'t agree on protocol version: client supports '
+                    '{}, server supports {}.'
+                    .format(_PROTOCOL_CAPABILITIES, server_versions))
+
+        self._protocol_ver = max(common_versions)
+        import sys
+        print('Settled for protocol version {}'.format(self._protocol_ver))
+
+        return self._protocol_ver
+
+    def _has_capability(self, capability):
+        """Checks if the established protocol version supports capability.
+
+        If not yet established, the negotiation happens first.
+        """
+        return capability in _PROTOCOL_CAPABILITIES[self._protocol_version()]
 
 
 class _FileLikeFromResponse(object):
