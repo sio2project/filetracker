@@ -5,6 +5,7 @@
 from __future__ import absolute_import
 
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -12,11 +13,15 @@ import tempfile
 from optparse import OptionParser
 
 import filetracker.servers.base
-import filetracker.servers.files
+from filetracker.servers.files import FiletrackerServer
 from filetracker.servers.migration import MigrationFiletrackerServer
 
 # Clients may use this as a sensible default port to connect to.
 DEFAULT_PORT = 9999
+
+
+def strip_margin(text):
+    return re.sub('\n[ \t]*\|', '\n', text)
 
 
 def main(args=None):
@@ -55,36 +60,34 @@ def main(args=None):
     if not os.path.exists(docroot):
         os.makedirs(docroot, 0o700)
 
-    if options.fallback_url is not None:
-        run_migration_server(options)
-        os.exit(0)
-
-    gunicorn_settings = """
-bind = ['{listen_on}:{port}']
-daemon = {daemonize}
-import multiprocessing
-workers = multiprocessing.cpu_count() * 2
-raw_env = ['FILETRACKER_DIR={filetracker_dir}']
+    gunicorn_settings = strip_margin("""
+        |bind = ['{listen_on}:{port}']
+        |daemon = {daemonize}
+        |import multiprocessing
+        |workers = multiprocessing.cpu_count() * 2
+        |raw_env = ['FILETRACKER_DIR={filetracker_dir}', 
+        |           'FILETRACKER_FALLBACK_URL={fallback_url}']
         """.format(
         listen_on=options.listen_on,
         port=options.port,
         daemonize=options.daemonize,
-        filetracker_dir=options.dir
-    )
+        filetracker_dir=options.dir,
+        fallback_url=options.fallback_url
+    ))
 
     if options.log:
-        gunicorn_settings += """
-errorlog = '{errorlog}'
-capture_output = True
+        gunicorn_settings += strip_margin("""
+        |errorlog = '{errorlog}'
+        |capture_output = True
         """.format(
             errorlog=options.log,
-        )
+        ))
     if options.access_log:
-        gunicorn_settings += """
-accesslog = '{accesslog}'
+        gunicorn_settings += strip_margin("""
+        |accesslog = '{accesslog}'
         """.format(
             accesslog=options.access_log,
-        )
+        ))
 
     conf_fd, conf_path = tempfile.mkstemp(text=True)
     try:
@@ -92,8 +95,11 @@ accesslog = '{accesslog}'
         conf_file.write(gunicorn_settings)
         conf_file.close()
 
-        args = ['gunicorn', '-c', conf_path,
-                'filetracker.servers.run:gunicorn_entry']
+        args = ['gunicorn', '-c', conf_path]
+        if options.fallback_url is not None:
+            args.append('filetracker.servers.run:gunicorn_entry_migration')
+        else:
+            args.append('filetracker.servers.run:gunicorn_entry')
 
         try:
             popen = subprocess.Popen(args)
@@ -114,18 +120,28 @@ accesslog = '{accesslog}'
         os.unlink(conf_path)
 
 
-def run_migration_server(options):
-    server = MigrationFiletrackerServer(options.fallback_url, options.dir)
-    filetracker.servers.base.start_standalone(server, options.port)
-
-
+# This filetracker_instance is cached between requests within one WSGI process.
+# There are no threading problems though,
+# because each process is set to use 1 thread.
 filetracker_instance = None
 
 
 def gunicorn_entry(env, start_response):
     global filetracker_instance
     if filetracker_instance is None:
-        filetracker_instance = filetracker.servers.files.FiletrackerServer()
+        filetracker_instance = FiletrackerServer()
+    return filetracker_instance(env, start_response)
+
+
+def gunicorn_entry_migration(env, start_response):
+    global filetracker_instance
+    if filetracker_instance is None:
+        fallback = os.environ.get('FILETRACKER_FALLBACK_URL', None)
+        if not fallback:
+            raise RuntimeError("Configuration error. Fallback url not set.")
+        filetracker_instance = MigrationFiletrackerServer(
+            redirect_url=fallback
+        )
     return filetracker_instance(env, start_response)
 
 
