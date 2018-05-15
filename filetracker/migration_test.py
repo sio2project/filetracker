@@ -16,8 +16,8 @@ from filetracker.client import Client
 from filetracker.servers.migration import MigrationFiletrackerServer
 from filetracker.servers.files import FiletrackerServer
 
-_TEST_PRIMARY_PORT_NUMBER = 45735
-_TEST_FALLBACK_PORT_NUMBER = 45745
+_TEST_PRIMARY_PORT_NUMBER = 45755
+_TEST_FALLBACK_PORT_NUMBER = 45765
 
 
 class MigrationTest(unittest.TestCase):
