@@ -14,7 +14,7 @@ import unittest
 from six import BytesIO
 
 from filetracker.client import Client
-from filetracker.servers.run import main as lighttpd_main
+from filetracker.servers.run import main as server_main
 
 # _CLIENT_WAIT_S and _FILE_SIZE should be picked in a way that the time
 # between spawning a client and this client sending a request is
@@ -92,4 +92,4 @@ class ParallelTest(unittest.TestCase):
 
 
 def _start_server(server_dir):
-    lighttpd_main(['-p', str(_TEST_PORT_NUMBER), '-d', server_dir, '-D'])
+    server_main(['-p', str(_TEST_PORT_NUMBER), '-d', server_dir, '-D'])
