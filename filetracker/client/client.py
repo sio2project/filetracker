@@ -242,8 +242,12 @@ class Client(object):
         finally:
             logger.debug('    processed %s in %.2fs', name, time.time() - t)
 
-    def put_file(self, name, filename, to_local_store=True,
-                 to_remote_store=True):
+    def put_file(self,
+                 name,
+                 filename,
+                 to_local_store=True,
+                 to_remote_store=True,
+                 compress_hint=True):
         """Adds file ``filename`` to the filetracker under the name ``name``.
 
            If the file already exists, a new version is created. In practice
@@ -258,6 +262,10 @@ class Client(object):
            directly copy the data to the final cache destination, but uses
            hardlinking. Therefore you should not modify the file in-place
            later as this would be disastrous.
+
+           If ``compress_hint`` is set to False, file is compressed on
+           the server, instead of the client. This is generally not
+           recommended, unless you know what you're doing.
         """
 
         if not to_local_store and not to_remote_store:
@@ -275,15 +283,14 @@ class Client(object):
             if (to_local_store or not self.remote_store) and self.local_store:
                 versioned_name = self.local_store.add_file(name, filename)
             if (to_remote_store or not self.local_store) and self.remote_store:
-                versioned_name = self.remote_store.add_file(name, filename)
+                versioned_name = self.remote_store.add_file(
+                        name, filename, compress_hint=compress_hint)
         finally:
             if lock:
                 lock.close()
 
         return versioned_name
 
-    # This is a very cool method except our server doesn't support DELETE
-    # requests. (SIO-2093)
     def delete_file(self, name):
         """Deletes the file identified by ``name`` along with its metadata.
 
