@@ -14,7 +14,7 @@ from filetracker.servers.storage import (FileStorage,
                                          FiletrackerFileNotFoundError)
 
 
-class LocalFileServer(base.Server):
+class FiletrackerServer(base.Server):
     """A WSGI application providing a HTTP server compatible with
        :class:`filetracker.RemoteDataStore`."""
 
@@ -150,4 +150,4 @@ def _copy_stream(src, dest, length):
 
 
 if __name__ == '__main__':
-    base.main(LocalFileServer())
+    base.main(FiletrackerServer())
