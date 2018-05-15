@@ -69,22 +69,17 @@ def main(args=None):
             mimetype.assign = (
                 "" => "application/octet-stream"
             )
-            $HTTP["request-method"] !~ "^(GET|HEAD)" {
-                fastcgi.server += (
-                  "" =>
-                  (( "bin-path" => "%(interpreter)s %(files_script)s",
-                     "bin-environment" => (
-                       "FILETRACKER_DIR" => "%(filetracker_dir)s"
-                     ),
-                     "socket" => "%(tempdir)s/filetracker-files.%(pid)d",
-                     "check-local" => "disable",
-                     "fix-root-scriptname" => "enable"
-                  ))
-                )
-            }
-            $HTTP["request-method"] =~ "^(GET|HEAD)" {
-                setenv.add-response-header = ( "Content-Encoding" => "gzip" )   
-            }
+            fastcgi.server += (
+              "" =>
+              (( "bin-path" => "%(interpreter)s %(files_script)s",
+                 "bin-environment" => (
+                   "FILETRACKER_DIR" => "%(filetracker_dir)s"
+                 ),
+                 "socket" => "%(tempdir)s/filetracker-files.%(pid)d",
+                 "check-local" => "disable",
+                 "fix-root-scriptname" => "enable"
+              ))
+            )
         """ % dict(
             filetracker_dir=filetracker_dir,
             docroot=docroot,
