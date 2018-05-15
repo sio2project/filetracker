@@ -1,18 +1,18 @@
 #!/usr/bin/env python
 
-"""A script for starting filetracker server using lighttpd."""
+"""A script for starting filetracker server using gunicorn."""
 
 from __future__ import absolute_import
-import os
-import os.path
-import sys
-from optparse import OptionParser
-import tempfile
-import subprocess
-import signal
 
-import filetracker.servers.files
+import os
+import signal
+import subprocess
+import sys
+import tempfile
+from optparse import OptionParser
+
 import filetracker.servers.base
+import filetracker.servers.files
 from filetracker.servers.migration import MigrationFiletrackerServer
 
 # Clients may use this as a sensible default port to connect to.
@@ -20,10 +20,7 @@ DEFAULT_PORT = 9999
 
 
 def main(args=None):
-    epilog = "If LIGHTTPD_DIR is set in environment, it is assumed that " \
-        "the lighttpd binary resides in that directory together with " \
-        "the required modules: mod_fastcgi, mod_setenv and mod_status."
-    parser = OptionParser(epilog=epilog)
+    parser = OptionParser()
     parser.add_option('-p', '--port', dest='port', default=DEFAULT_PORT,
             type="int",
             help="Listen on specified port number")
@@ -34,13 +31,12 @@ def main(args=None):
             help="Specify Filetracker dir (taken from FILETRACKER_DIR "
                  "environment variable if not present)")
     parser.add_option('-L', '--log', dest='log', default=None,
-            help="Log file location (no log by default)")
+            help="Error log file location (no log by default)")
+    parser.add_option('--access-log', dest='access_log', default=None,
+                      help="Access log file location (no log by default)")
     parser.add_option('-D', '--no-daemon', dest='daemonize',
             action='store_false', default=True,
             help="Do not daemonize, stay in foreground")
-    parser.add_option('--lighttpd-bin', dest='lighttpd_bin',
-            default='lighttpd',
-            help="Specify the lighttpd binary to use")
     parser.add_option('--fallback-url', dest='fallback_url',
             default=None,
             help="Turns on migration mode "
@@ -63,76 +59,46 @@ def main(args=None):
         run_migration_server(options)
         os.exit(0)
 
-    LIGHTHTTPD_CONF = """
-            server.tag = "filetracker"
-            server.document-root = "%(docroot)s"
-            server.port = %(port)d
-            server.bind = "%(listen_on)s"
-            server.modules = ( "mod_fastcgi", "mod_status", "mod_setenv" )
-            status.status-url = "/status"
-            #debug.log-response-header = "enable"
-            #debug.log-request-header = "enable"
-            #debug.log-request-handling = "enable"
-            #debug.log-condition-handling = "enable"
-            fastcgi.debug = 1
-            mimetype.assign = (
-                "" => "application/octet-stream"
-            )
-            fastcgi.server += (
-              "" =>
-              (( "bin-path" => "%(interpreter)s %(files_script)s",
-                 "bin-environment" => (
-                   "FILETRACKER_DIR" => "%(filetracker_dir)s"
-                 ),
-                 "socket" => "%(tempdir)s/filetracker-files.%(pid)d",
-                 "check-local" => "disable",
-                 "fix-root-scriptname" => "enable"
-              ))
-            )
-        """ % dict(
-            filetracker_dir=filetracker_dir,
-            docroot=docroot,
-            port=options.port,
-            listen_on=options.listen_on,
-            interpreter=sys.executable,
-            files_script=filetracker.servers.files.__file__,
-            pid=os.getpid(),
-            tempdir=tempfile.gettempdir())
+    gunicorn_settings = """
+bind = ['{listen_on}:{port}']
+daemon = {daemonize}
+import multiprocessing
+workers = multiprocessing.cpu_count() * 2
+raw_env = ['FILETRACKER_DIR={filetracker_dir}']
+        """.format(
+        listen_on=options.listen_on,
+        port=options.port,
+        daemonize=options.daemonize,
+        filetracker_dir=options.dir
+    )
 
     if options.log:
-        LIGHTHTTPD_CONF += """
-                server.modules += ( "mod_accesslog" )
-                accesslog.filename = "%(log)s"
-            """ % dict(log=os.path.abspath(options.log))
+        gunicorn_settings += """
+errorlog = '{errorlog}'
+capture_output = True
+        """.format(
+            errorlog=options.log,
+        )
+    if options.access_log:
+        gunicorn_settings += """
+accesslog = '{accesslog}'
+        """.format(
+            accesslog=options.access_log,
+        )
 
     conf_fd, conf_path = tempfile.mkstemp(text=True)
     try:
         conf_file = os.fdopen(conf_fd, 'w')
-        conf_file.write(LIGHTHTTPD_CONF)
+        conf_file.write(gunicorn_settings)
         conf_file.close()
 
-        env = os.environ.copy()
-        if sys.platform == 'darwin' or not options.daemonize:
-            # setsid(1) is not available on Mac
-            args = []
-        else:
-            args = ['setsid']
-        if 'LIGHTTPD_DIR' in os.environ:
-            server_dir = os.environ['LIGHTTPD_DIR']
-            args += [os.path.join(server_dir, 'lighttpd'),
-                    '-f', conf_path, '-m', server_dir]
-            env['LD_LIBRARY_PATH'] = server_dir + ':' \
-                    + env.get('LD_LIBRARY_PATH', '')
-        else:
-            args += [options.lighttpd_bin, '-f', conf_path]
-
-        if not options.daemonize:
-            args.append('-D')
+        args = ['gunicorn', '-c', conf_path,
+                'filetracker.servers.run:gunicorn_entry']
 
         try:
-            popen = subprocess.Popen(args, env=env)
+            popen = subprocess.Popen(args)
         except OSError as e:
-            raise RuntimeError("Cannot run lighttpd:\n%s" % e)
+            raise RuntimeError("Cannot run gunicorn:\n%s" % e)
 
         signal.signal(signal.SIGINT, lambda signum, frame: popen.terminate())
         signal.signal(signal.SIGTERM, lambda signum, frame: popen.terminate())
@@ -141,9 +107,9 @@ def main(args=None):
         if not options.daemonize:
             sys.exit(retval)
         if retval:
-            raise RuntimeError("Lighttpd exited with code %d" % retval)
+            raise RuntimeError("gunicorn exited with code %d" % retval)
     finally:
-        # At this point lighttpd does not need the configuration file, so it
+        # At this point gunicorn does not need the configuration file, so it
         # can be safely deleted.
         os.unlink(conf_path)
 
@@ -151,6 +117,16 @@ def main(args=None):
 def run_migration_server(options):
     server = MigrationFiletrackerServer(options.fallback_url, options.dir)
     filetracker.servers.base.start_standalone(server, options.port)
+
+
+filetracker_instance = None
+
+
+def gunicorn_entry(env, start_response):
+    global filetracker_instance
+    if filetracker_instance is None:
+        filetracker_instance = filetracker.servers.files.FiletrackerServer()
+    return filetracker_instance(env, start_response)
 
 
 if __name__ == '__main__':
