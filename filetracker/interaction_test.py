@@ -95,6 +95,21 @@ class InteractionTest(unittest.TestCase):
         f, _ = self.client.get_stream('/streams.txt')
         self.assertEqual(f.read(), b'hello streams')
 
+    def test_big_files_should_be_handled_correctly(self):
+        # To be more precise, Content-Length header should be
+        # set to the actual size of the file.
+        src_file = os.path.join(self.temp_dir, 'big.txt')
+        with open(src_file, 'wb') as sf:
+            sf.write(b'r')
+            for _ in range(1024 * 1024):
+                sf.write(b'ee')
+
+        self.client.put_file('/big.txt', src_file)
+
+        f, _ = self.client.get_stream('/big.txt')
+        with open(src_file, 'rb') as sf:
+            self.assertEqual(sf.read(), f.read())
+
     def test_file_version_should_be_set_to_current_time_on_upload(self):
         src_file = os.path.join(self.temp_dir, 'version.txt')
         with open(src_file, 'wb') as sf:
