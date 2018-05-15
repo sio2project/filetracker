@@ -363,8 +363,7 @@ def _makedirs(path):
 def lutime(path, time):
     if six.PY2:
         t = email.utils.formatdate(time)
-        if subprocess.call(["touch", "-c", "-h", "-d", t, path]) != 0:
+        if subprocess.call(['touch', '-c', '-h', '-d', t, path]) != 0:
             raise RuntimeError
     else:
         os.utime(path, (time, time), follow_symlinks=False)
-
