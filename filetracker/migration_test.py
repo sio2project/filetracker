@@ -4,17 +4,15 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from multiprocessing import Process
 import os
 import shutil
-import signal
 import tempfile
 import time
 import unittest
-from wsgiref.simple_server import make_server
+from filetracker.servers.run import main as server_main
 
 from filetracker.client import Client
-from filetracker.servers.migration import MigrationFiletrackerServer
-from filetracker.servers.files import FiletrackerServer
 
 _TEST_PRIMARY_PORT_NUMBER = 45755
 _TEST_FALLBACK_PORT_NUMBER = 45765
@@ -29,13 +27,17 @@ class MigrationTest(unittest.TestCase):
         cls.fallback_server_dir = tempfile.mkdtemp()
         cls.temp_dir = tempfile.mkdtemp()
 
-        cls.fallback_server = FiletrackerServer(cls.fallback_server_dir)
-        cls.fallback_server_pid = _fork_to_server(cls.fallback_server,
-                                              _TEST_FALLBACK_PORT_NUMBER)
+        cls.fallback_server_process = Process(
+            target=_start_fallback_server, args=(cls.fallback_server_dir,))
+        cls.fallback_server_process.start()
 
         fallback_url = 'http://127.0.0.1:{}'.format(_TEST_FALLBACK_PORT_NUMBER)
-        cls.server = MigrationFiletrackerServer(fallback_url, cls.server_dir)
-        cls.server_pid = _fork_to_server(cls.server, _TEST_PRIMARY_PORT_NUMBER)
+        cls.server_process = Process(
+            target=_start_migration_server,
+            args=(cls.server_dir, fallback_url))
+        cls.server_process.start()
+
+        time.sleep(1)  # give servers some time to start
 
         cls.client = Client(
             cache_dir=cls.cache_dir1,
@@ -47,8 +49,9 @@ class MigrationTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        os.kill(cls.server_pid, signal.SIGKILL)
-        os.kill(cls.fallback_server_pid, signal.SIGKILL)
+        cls.fallback_server_process.terminate()
+        cls.server_process.terminate()
+
         shutil.rmtree(cls.cache_dir1)
         shutil.rmtree(cls.cache_dir2)
         shutil.rmtree(cls.fallback_server_dir)
@@ -103,13 +106,10 @@ class MigrationTest(unittest.TestCase):
         self.assertEqual(f.read(), b'remote hello')
 
 
-def _fork_to_server(server, port):
-    """Returns child server process PID."""
-    pid = os.fork()
-    if pid > 0:
-        time.sleep(1)  # give server some time to start
-        return pid
-    else:
-        httpd = make_server('', port, server)
-        print('Serving on port %d' % port)
-        httpd.serve_forever()
+def _start_fallback_server(server_dir):
+    server_main(['-p', str(_TEST_FALLBACK_PORT_NUMBER), '-d', server_dir, '-D'])
+
+
+def _start_migration_server(server_dir, fallback_url):
+    server_main(['-p', str(_TEST_PRIMARY_PORT_NUMBER), '-d', server_dir, '-D',
+                 '--fallback-url', fallback_url])
