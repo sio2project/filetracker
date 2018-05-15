@@ -78,20 +78,18 @@ class FiletrackerServer(base.Server):
             yield data
 
     def _file_headers(self, path):
-        st = os.lstat(path)
+        link_st = os.lstat(path)
+        blob_st = os.stat(path)
         return [
-                ('Last-Modified', email.utils.formatdate(st.st_mtime)),
+                ('Last-Modified', email.utils.formatdate(link_st.st_mtime)),
                 ('Content-Type', 'application/octet-stream'),
-                ('Content-Length', str(st.st_size)),
+                ('Content-Length', str(blob_st.st_size)),
                 ('Content-Encoding', 'gzip')
             ]
 
     def handle_GET(self, environ, start_response):
-        # This is a standard GET with nothing fancy. If you can,
-        # configure your web server to directly serve files
-        # from self.dir instead of going through this code.
-        # But the server must generate Last-Modified headers.
         path = os.path.join(self.dir, self._get_path(environ))
+
         if not os.path.isfile(path):
             start_response('404 Not Found', [('Content-Type', 'text/plain')])
             return [('File not found: %s' % path).encode()]
@@ -99,7 +97,6 @@ class FiletrackerServer(base.Server):
         return self._fileobj_iterator(open(path, 'rb'))
 
     def handle_HEAD(self, environ, start_response):
-        # This is a standard HEAD with nothing fancy.
         path = os.path.join(self.dir, self._get_path(environ))
         if not os.path.isfile(path):
             start_response('404 Not Found', [('Content-Type', 'text/plain')])
