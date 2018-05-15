@@ -107,9 +107,10 @@ class MigrationTest(unittest.TestCase):
 
 
 def _start_fallback_server(server_dir):
-    server_main(['-p', str(_TEST_FALLBACK_PORT_NUMBER), '-d', server_dir, '-D'])
+    server_main(['-p', str(_TEST_FALLBACK_PORT_NUMBER), '-d', server_dir, '-D',
+                 '--workers', '4'])
 
 
 def _start_migration_server(server_dir, fallback_url):
     server_main(['-p', str(_TEST_PRIMARY_PORT_NUMBER), '-d', server_dir, '-D',
-                 '--fallback-url', fallback_url])
+                 '--fallback-url', fallback_url, '--workers', '4'])

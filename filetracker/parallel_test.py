@@ -92,4 +92,5 @@ class ParallelTest(unittest.TestCase):
 
 
 def _start_server(server_dir):
-    server_main(['-p', str(_TEST_PORT_NUMBER), '-d', server_dir, '-D'])
+    server_main(['-p', str(_TEST_PORT_NUMBER), '-d', server_dir, '-D',
+                 '--workers', '6'])

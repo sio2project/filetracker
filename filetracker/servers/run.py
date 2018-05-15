@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import
 
+import multiprocessing
 import os
 import re
 import signal
@@ -12,7 +13,6 @@ import sys
 import tempfile
 from optparse import OptionParser
 
-import filetracker.servers.base
 from filetracker.servers.files import FiletrackerServer
 from filetracker.servers.migration import MigrationFiletrackerServer
 
@@ -27,7 +27,7 @@ def strip_margin(text):
 def main(args=None):
     parser = OptionParser()
     parser.add_option('-p', '--port', dest='port', default=DEFAULT_PORT,
-            type="int",
+            type='int',
             help="Listen on specified port number")
     parser.add_option('-l', '--listen-on', dest='listen_on',
             default='127.0.0.1',
@@ -46,6 +46,9 @@ def main(args=None):
             default=None,
             help="Turns on migration mode "
                  "and redirects requests to nonexistent files to the remote")
+    parser.add_option('--workers', dest='workers', type='int',
+            default=2 * multiprocessing.cpu_count(),
+            help="Specifies the amount of worker processes to use")
     options, args = parser.parse_args(args)
     if args:
         parser.error("Unrecognized arguments: " + ' '.join(args))
@@ -63,14 +66,14 @@ def main(args=None):
     gunicorn_settings = strip_margin("""
         |bind = ['{listen_on}:{port}']
         |daemon = {daemonize}
-        |import multiprocessing
-        |workers = multiprocessing.cpu_count() * 2
+        |workers = {workers}
         |raw_env = ['FILETRACKER_DIR={filetracker_dir}', 
         |           'FILETRACKER_FALLBACK_URL={fallback_url}']
         """.format(
         listen_on=options.listen_on,
         port=options.port,
         daemonize=options.daemonize,
+        workers=options.workers,
         filetracker_dir=options.dir,
         fallback_url=options.fallback_url
     ))
