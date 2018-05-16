@@ -12,7 +12,7 @@ import time
 import unittest
 from filetracker.servers.run import main as server_main
 
-from filetracker.client import Client
+from filetracker.client import Client, FiletrackerError
 
 _TEST_PRIMARY_PORT_NUMBER = 45755
 _TEST_FALLBACK_PORT_NUMBER = 45765
@@ -104,6 +104,10 @@ class MigrationTest(unittest.TestCase):
 
         f = self.client.get_stream('/fallback.txt')[0]
         self.assertEqual(f.read(), b'remote hello')
+
+    def test_file_version_of_not_existent_file_should_return_404(self):
+        with self.assertRaisesRegexp(FiletrackerError, "404"):
+            self.client.get_stream('/nonexistent.txt')
 
 
 def _start_fallback_server(server_dir):
