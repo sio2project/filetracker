@@ -12,7 +12,7 @@ import time
 import unittest
 
 from filetracker.client import Client, FiletrackerError
-from filetracker.servers.run import main as lighttpd_main
+from filetracker.servers.run import main as server_main
 
 _TEST_PORT_NUMBER = 45735
 
@@ -184,4 +184,5 @@ class InteractionTest(unittest.TestCase):
 
 
 def _start_server(server_dir):
-    lighttpd_main(['-p', str(_TEST_PORT_NUMBER), '-d', server_dir, '-D'])
+    server_main(['-p', str(_TEST_PORT_NUMBER), '-d', server_dir, '-D',
+                 '--workers', '4'])
