@@ -12,6 +12,8 @@ import subprocess
 import signal
 
 import filetracker.servers.files
+import filetracker.servers.base
+from filetracker.servers.migration import MigrationFiletrackerServer
 
 # Clients may use this as a sensible default port to connect to.
 DEFAULT_PORT = 9999
@@ -39,7 +41,10 @@ def main(args=None):
     parser.add_option('--lighttpd-bin', dest='lighttpd_bin',
             default='lighttpd',
             help="Specify the lighttpd binary to use")
-
+    parser.add_option('--fallback-url', dest='fallback_url',
+            default=None,
+            help="Turns on migration mode "
+                 "and redirects requests to nonexistent files to the remote")
     options, args = parser.parse_args(args)
     if args:
         parser.error("Unrecognized arguments: " + ' '.join(args))
@@ -47,9 +52,16 @@ def main(args=None):
     if not options.dir:
         options.dir = os.environ['FILETRACKER_DIR']
 
-    docroot = os.path.abspath(options.dir)
+    filetracker_dir = os.path.abspath(options.dir)
+    if not os.path.exists(filetracker_dir):
+        os.makedirs(filetracker_dir, 0o700)
+    docroot = os.path.join(filetracker_dir, 'links')
     if not os.path.exists(docroot):
         os.makedirs(docroot, 0o700)
+
+    if options.fallback_url is not None:
+        run_migration_server(options)
+        os.exit(0)
 
     LIGHTHTTPD_CONF = """
             server.tag = "filetracker"
@@ -66,20 +78,19 @@ def main(args=None):
             mimetype.assign = (
                 "" => "application/octet-stream"
             )
-            setenv.add-response-header = ( "Content-Encoding" => "gzip" )
-            $HTTP["request-method"] !~ "^(GET|HEAD)" {
-                fastcgi.server += (
-                  "/files" =>
-                  (( "bin-path" => "%(interpreter)s %(files_script)s",
-                     "bin-environment" => (
-                       "FILETRACKER_DIR" => "%(docroot)s"
-                     ),
-                     "socket" => "%(tempdir)s/filetracker-files.%(pid)d",
-                     "check-local" => "disable"
-                  ))
-                )
-            }
+            fastcgi.server += (
+              "" =>
+              (( "bin-path" => "%(interpreter)s %(files_script)s",
+                 "bin-environment" => (
+                   "FILETRACKER_DIR" => "%(filetracker_dir)s"
+                 ),
+                 "socket" => "%(tempdir)s/filetracker-files.%(pid)d",
+                 "check-local" => "disable",
+                 "fix-root-scriptname" => "enable"
+              ))
+            )
         """ % dict(
+            filetracker_dir=filetracker_dir,
             docroot=docroot,
             port=options.port,
             listen_on=options.listen_on,
@@ -135,6 +146,12 @@ def main(args=None):
         # At this point lighttpd does not need the configuration file, so it
         # can be safely deleted.
         os.unlink(conf_path)
+
+
+def run_migration_server(options):
+    server = MigrationFiletrackerServer(options.fallback_url, options.dir)
+    filetracker.servers.base.start_standalone(server, options.port)
+
 
 if __name__ == '__main__':
     main()

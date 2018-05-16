@@ -4,16 +4,15 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from multiprocessing import Process
 import os
 import shutil
-import signal
 import tempfile
 import time
 import unittest
-from wsgiref.simple_server import make_server
 
 from filetracker.client import Client, FiletrackerError
-from filetracker.servers.files import LocalFileServer
+from filetracker.servers.run import main as lighttpd_main
 
 _TEST_PORT_NUMBER = 45735
 
@@ -25,8 +24,10 @@ class InteractionTest(unittest.TestCase):
         cls.server_dir = tempfile.mkdtemp()
         cls.temp_dir = tempfile.mkdtemp()
 
-        cls.server = LocalFileServer(cls.server_dir)
-        cls.server_pid = _fork_to_server(cls.server)
+        cls.server_process = Process(
+                target=_start_server, args=(cls.server_dir,))
+        cls.server_process.start()
+        time.sleep(1)   # give server some time to start
 
         cls.client = Client(
                 cache_dir=cls.cache_dir,
@@ -34,7 +35,7 @@ class InteractionTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        os.kill(cls.server_pid, signal.SIGKILL)
+        cls.server_process.terminate()
         shutil.rmtree(cls.cache_dir)
         shutil.rmtree(cls.server_dir)
         shutil.rmtree(cls.temp_dir)
@@ -53,10 +54,8 @@ class InteractionTest(unittest.TestCase):
 
         self.client.put_file('/put.txt', temp_file)
 
-        # The remote path looks strange, but with lighttpd one 'files' is
-        # stripped away (apparently).
         cache_path = os.path.join(self.cache_dir, 'files', 'put.txt')
-        remote_path = os.path.join(self.server_dir, 'files', 'files', 'put.txt')
+        remote_path = os.path.join(self.server_dir, 'links', 'put.txt')
 
         self.assertTrue(os.path.exists(cache_path))
         self.assertTrue(os.path.exists(remote_path))
@@ -97,37 +96,51 @@ class InteractionTest(unittest.TestCase):
         f, _ = self.client.get_stream('/streams.txt')
         self.assertEqual(f.read(), b'hello streams')
 
-    def test_file_version_should_return_modification_time(self):
+    def test_big_files_should_be_handled_correctly(self):
+        # To be more precise, Content-Length header should be
+        # set to the actual size of the file.
+        src_file = os.path.join(self.temp_dir, 'big.txt')
+        with open(src_file, 'wb') as sf:
+            sf.write(b'r')
+            for _ in range(1024 * 1024):
+                sf.write(b'ee')
+
+        self.client.put_file('/big.txt', src_file)
+
+        f, _ = self.client.get_stream('/big.txt')
+        with open(src_file, 'rb') as sf:
+            self.assertEqual(sf.read(), f.read())
+
+    def test_file_version_should_be_set_to_current_time_on_upload(self):
         src_file = os.path.join(self.temp_dir, 'version.txt')
         with open(src_file, 'wb') as sf:
             sf.write(b'hello version')
+        os.utime(src_file, (1, 1))
 
+        pre_upload = int(time.time())
         self.client.put_file('/version.txt', src_file)
+        post_upload = int(time.time())
 
-        remote_path = os.path.join(
-                self.server_dir, 'files', 'files', 'version.txt')
-        modification_time = int(os.stat(remote_path).st_mtime)
+        version = self.client.file_version('/version.txt')
+        self.assertNotEqual(version, 1)
+        self.assertTrue(pre_upload <= version <= post_upload)
 
-        self.assertEqual(
-                self.client.file_version('/version.txt'), modification_time)
-
-    def test_file_size_should_return_remote_file_size(self):
-        src_file = os.path.join(self.temp_dir, 'size.txt')
+    def test_every_link_should_have_independent_version(self):
+        src_file = os.path.join(self.temp_dir, 'foo.txt')
         with open(src_file, 'wb') as sf:
-            sf.write(b'hello size')
+            sf.write(b'hello foo')
 
-        self.client.put_file('/size.txt', src_file)
+        self.client.put_file('/foo_a.txt', src_file)
+        time.sleep(1)
+        self.client.put_file('/foo_b.txt', src_file)
 
-        remote_path = os.path.join(
-                self.server_dir, 'files', 'files', 'size.txt')
-        remote_size = int(os.stat(remote_path).st_size)
+        version_a = self.client.file_version('/foo_a.txt')
+        version_b = self.client.file_version('/foo_b.txt')
 
-        self.assertEqual(
-                self.client.file_size('/size.txt'), remote_size)
+        self.assertNotEqual(version_a, version_b)
 
     def test_put_older_should_fail(self):
-        """This test assumes file version is stored in mtime.
-        """
+        """This test assumes file version is stored in mtime."""
         src_file = os.path.join(self.temp_dir, 'older.txt')
         with open(src_file, 'wb') as sf:
             sf.write(b'version 1')
@@ -149,14 +162,26 @@ class InteractionTest(unittest.TestCase):
         with self.assertRaises(FiletrackerError):
             self.client.get_stream('/older.txt@1')
 
+    def test_get_nonexistent_should_404(self):
+        with self.assertRaisesRegexp(FiletrackerError, "404"):
+            self.client.get_stream('/nonexistent.txt')
 
-def _fork_to_server(server):
-    """Returns child server process PID."""
-    pid = os.fork()
-    if pid > 0:
-        time.sleep(1)   # give server some time to start
-        return pid
-    else:
-        httpd = make_server('', _TEST_PORT_NUMBER, server)
-        print('Serving on port %d' % _TEST_PORT_NUMBER)
-        httpd.serve_forever()
+    def test_delete_nonexistent_should_404(self):
+        with self.assertRaisesRegexp(FiletrackerError, "404"):
+            self.client.delete_file('/nonexistent.txt')
+
+    def test_delete_should_remove_file(self):
+        src_file = os.path.join(self.temp_dir, 'del.txt')
+
+        with open(src_file, 'wb') as sf:
+            sf.write(b'test')
+
+        self.client.put_file('/del.txt', src_file)
+        self.client.delete_file('/del.txt')
+
+        with self.assertRaisesRegexp(FiletrackerError, "404"):
+            self.client.get_stream('/del.txt')
+
+
+def _start_server(server_dir):
+    lighttpd_main(['-p', str(_TEST_PORT_NUMBER), '-d', server_dir, '-D'])

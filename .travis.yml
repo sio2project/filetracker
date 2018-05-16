@@ -7,5 +7,6 @@ addons:
   apt:
     packages:
       libdb-dev
+      lighttpd
 install: pip install tox-travis
 script: tox
