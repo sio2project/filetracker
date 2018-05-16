@@ -142,7 +142,7 @@ class RemoteDataStore(DataStore):
 
     def exists(self, name):
         url, version = self._parse_name(name)
-        response = requests.head(url)
+        response = requests.head(url, allow_redirects=True)
         if response.status_code == 404:
             return False
 
@@ -156,14 +156,14 @@ class RemoteDataStore(DataStore):
     @_verbose_http_errors
     def file_version(self, name):
         url, version = self._parse_name(name)
-        response = requests.head(url)
+        response = requests.head(url, allow_redirects=True)
         response.raise_for_status()
         return self._parse_last_modified(response)
 
     @_verbose_http_errors
     def file_size(self, name):
         url, version = self._parse_name(name)
-        response = requests.head(url)
+        response = requests.head(url, allow_redirects=True)
         response.raise_for_status()
         return int(response.headers.get('content-length', 0))
 
