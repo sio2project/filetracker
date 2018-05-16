@@ -32,6 +32,7 @@ setup(
             'filetracker-server = filetracker.servers.run:main',
             'filetracker-cache-cleaner = filetracker.cachecleaner:main',
             'filetracker-migrate = filetracker.scripts.migrate:main',
+            'filetracker-recover = filetracker.scripts.recover:main',
         ],
     }
 )
