@@ -4,9 +4,10 @@ import email.utils
 import functools
 import gzip
 import logging
+import os
 import shutil
-import time
 import tempfile
+import time
 
 import requests
 from six.moves.urllib.request import pathname2url
@@ -116,7 +117,8 @@ class RemoteDataStore(DataStore):
                     with gzip.GzipFile(fileobj=tmp, mode='wb') as gz:
                         shutil.copyfileobj(f, gz)
                     tmp.seek(0)
-                    headers.update({'Content-Encoding': 'gzip'})
+                    headers['Content-Encoding'] = 'gzip'
+                    headers['Logical-Size'] = str(os.stat(filename).st_size)
                     response = self._put_file(url, version, tmp, headers)
             else:
                 response = self._put_file(url, version, f, headers)
@@ -165,7 +167,7 @@ class RemoteDataStore(DataStore):
         url, version = self._parse_name(name)
         response = requests.head(url, allow_redirects=True)
         response.raise_for_status()
-        return int(response.headers.get('content-length', 0))
+        return int(response.headers.get('logical-size', 0))
 
     @_verbose_http_errors
     def delete_file(self, filename):

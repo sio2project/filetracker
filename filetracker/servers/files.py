@@ -55,18 +55,20 @@ class FiletrackerServer(base.Server):
         compressed = environ.get('HTTP_CONTENT_ENCODING', None) == 'gzip'
 
         digest = environ.get('HTTP_SHA256_CHECKSUM', None)
+        logical_size = environ.get('HTTP_LOGICAL_SIZE', None)
 
         version = self.storage.store(name=path,
                                      data=environ['wsgi.input'],
                                      version=last_modified,
                                      size=content_length,
                                      compressed=compressed,
-                                     digest=digest)
+                                     digest=digest,
+                                     logical_size=logical_size)
         start_response('200 OK', [
                 ('Content-Type', 'text/plain'),
                 ('Last-Modified', email.utils.formatdate(version)),
             ])
-        return [b'OK']
+        return []
 
     @staticmethod
     def _fileobj_iterator(fileobj, bufsize=65536):
@@ -77,31 +79,36 @@ class FiletrackerServer(base.Server):
                 return
             yield data
 
-    def _file_headers(self, path):
-        link_st = os.lstat(path)
-        blob_st = os.stat(path)
+    def _file_headers(self, name):
+        link_st = os.lstat(os.path.join(self.dir, name))
+        blob_st = os.stat(os.path.join(self.dir, name))
+        logical_size = self.storage.logical_size(name)
         return [
-                ('Last-Modified', email.utils.formatdate(link_st.st_mtime)),
                 ('Content-Type', 'application/octet-stream'),
                 ('Content-Length', str(blob_st.st_size)),
-                ('Content-Encoding', 'gzip')
+                ('Content-Encoding', 'gzip'),
+                ('Last-Modified', email.utils.formatdate(link_st.st_mtime)),
+                ('Logical-Size', str(logical_size)),
             ]
 
     def handle_GET(self, environ, start_response):
-        path = os.path.join(self.dir, self._get_path(environ))
+        name = self._get_path(environ)
+        path = os.path.join(self.dir, name)
 
         if not os.path.isfile(path):
             start_response('404 Not Found', [('Content-Type', 'text/plain')])
             return [('File not found: %s' % path).encode()]
-        start_response('200 OK', self._file_headers(path))
+        start_response('200 OK', self._file_headers(name))
         return self._fileobj_iterator(open(path, 'rb'))
 
     def handle_HEAD(self, environ, start_response):
-        path = os.path.join(self.dir, self._get_path(environ))
+        name = self._get_path(environ)
+        path = os.path.join(self.dir, name)
+
         if not os.path.isfile(path):
             start_response('404 Not Found', [('Content-Type', 'text/plain')])
             return [('File not found: %s' % path).encode()]
-        start_response('200 OK', self._file_headers(path))
+        start_response('200 OK', self._file_headers(name))
         return []
 
     def handle_DELETE(self, environ, start_response):
@@ -123,7 +130,7 @@ class FiletrackerServer(base.Server):
             return []
 
         start_response('200 OK', [])
-        return [b'OK']
+        return []
 
 
 if __name__ == '__main__':
