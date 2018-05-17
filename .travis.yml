@@ -8,5 +8,7 @@ addons:
     packages:
       libdb-dev
       lighttpd
-install: pip install tox-travis
+install: pip install codecov tox-travis
 script: tox
+after_success:
+  - codecov
