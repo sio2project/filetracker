@@ -37,7 +37,7 @@ class MigrationTest(unittest.TestCase):
             args=(cls.server_dir, fallback_url))
         cls.server_process.start()
 
-        time.sleep(1)  # give servers some time to start
+        time.sleep(2)  # give servers some time to start
 
         cls.client = Client(
             cache_dir=cls.cache_dir1,
