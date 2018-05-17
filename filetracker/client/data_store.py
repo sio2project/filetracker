@@ -4,7 +4,7 @@ import collections
 import os
 import shutil
 
-from filetracker.client.utils import split_name, _mkdir
+from filetracker.utils import split_name, mkdir
 
 
 class DataStore(object):
@@ -90,7 +90,7 @@ class DataStore(object):
 
         dir_path = os.path.dirname(filename)
         if dir_path:
-            _mkdir(dir_path)
+            mkdir(dir_path)
 
         with open(filename, 'wb') as f:
             shutil.copyfileobj(stream, f)
