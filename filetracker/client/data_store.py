@@ -4,7 +4,7 @@ import collections
 import os
 import shutil
 
-from filetracker.client.utils import split_name, _mkdir
+from filetracker.utils import split_name, _mkdir
 
 
 class DataStore(object):

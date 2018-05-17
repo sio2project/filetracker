@@ -3,7 +3,7 @@
 import fcntl
 import os
 
-from filetracker.client.utils import split_name, _check_name, _mkdir
+from filetracker.utils import split_name, _check_name, _mkdir
 
 
 class LockManager(object):

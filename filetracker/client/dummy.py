@@ -11,7 +11,7 @@ from six import BytesIO
 
 from filetracker.client import Client
 from filetracker.client.data_store import DataStore
-from filetracker.client.utils import split_name, versioned_name, _check_name
+from filetracker.utils import split_name, versioned_name, _check_name
 
 
 class DummyDataStore(DataStore):

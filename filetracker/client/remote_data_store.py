@@ -14,8 +14,8 @@ from six.moves.urllib.parse import urlencode
 
 from filetracker.client import FiletrackerError
 from filetracker.client.data_store import DataStore
-from filetracker.client.utils import (split_name, versioned_name, _check_name,
-                                      _compute_checksum)
+from filetracker.utils import (split_name, versioned_name, _check_name,
+                               _file_digest)
 
 logger = logging.getLogger('filetracker')
 
@@ -90,7 +90,7 @@ class RemoteDataStore(DataStore):
     def add_file(self, name, filename, compress_hint=True):
         url, version = self._parse_name(name)
 
-        sha = _compute_checksum(filename)
+        sha = _file_digest(filename)
 
         headers = {
             'SHA256-Checksum': sha

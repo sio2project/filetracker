@@ -12,7 +12,7 @@ from filetracker.client import FiletrackerError
 from filetracker.client.local_data_store import LocalDataStore
 from filetracker.client.lock_manager import FcntlLockManager, NoOpLockManager
 from filetracker.client.remote_data_store import RemoteDataStore
-from filetracker.client.utils import split_name, versioned_name, _check_name
+from filetracker.utils import split_name, versioned_name, _check_name
 
 logger = logging.getLogger('filetracker')
 

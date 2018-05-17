@@ -6,6 +6,7 @@ import os
 import shutil
 
 import six
+from six import __init__
 
 
 def split_name(name):
@@ -61,15 +62,27 @@ def _mkdir(name):
             raise
 
 
-def _compute_checksum(filename):
-    """Compute a checksum of a file
-       Implementation like in https://stackoverflow.com/a/22058673
+_BUFFER_SIZE = 64 * 1024
+
+
+def _file_digest(source):
+    """Calculates SHA256 digest of a file.
+
+    Args:
+        source: either a file-like object or a path to file
     """
-    sha = hashlib.sha256()
-    with open(filename, 'rb') as f:
-        while True:
-            data = f.read(65536)
-            if not data:
-                break
-            sha.update(data)
-    return sha.hexdigest()
+    hash_sha256 = hashlib.sha256()
+
+    should_close = False
+
+    if isinstance(source, six.string_types):
+        should_close = True
+        source = open(source, 'rb')
+
+    for chunk in iter(lambda: source.read(_BUFFER_SIZE), b''):
+        hash_sha256.update(chunk)
+
+    if should_close:
+        source.close()
+
+    return hash_sha256.hexdigest()

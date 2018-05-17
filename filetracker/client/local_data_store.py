@@ -5,7 +5,7 @@ import shutil
 
 from filetracker.client import FiletrackerError
 from filetracker.client.data_store import DataStore
-from filetracker.client.utils import split_name, versioned_name, _check_name, _mkdir
+from filetracker.utils import split_name, versioned_name, _check_name, _mkdir
 
 
 class LocalDataStore(DataStore):
