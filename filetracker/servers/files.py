@@ -6,6 +6,7 @@ from __future__ import print_function
 
 import email.utils
 import os.path
+import time
 
 from six.moves.urllib.parse import parse_qs
 
@@ -29,18 +30,22 @@ class FiletrackerServer(base.Server):
         self.dir = self.storage.links_dir
 
     @staticmethod
-    def _get_path(environ):
+    def get_path(environ, expected_endpoint="/files"):
         path = environ['PATH_INFO']
         if '..' in path:
             raise ValueError('Path cannot contain "..".')
-        return path.lstrip("/") # strip leading slashes
-        # so that os.path.join works in a reasonable way
+        if not path.startswith(expected_endpoint + '/'):
+            raise ValueError(
+                    'Unsupported endpoint, expected {}/...'
+                    .format(expected_endpoint))
+
+        return path[len(expected_endpoint + '/'):]
 
     def parse_query_params(self, environ):
         return parse_qs(environ.get('QUERY_STRING', ''))
 
     def handle_PUT(self, environ, start_response):
-        path = self._get_path(environ)
+        path = self.get_path(environ)
         content_length = int(environ.get('CONTENT_LENGTH'))
 
         query_params = self.parse_query_params(environ)
@@ -88,7 +93,11 @@ class FiletrackerServer(base.Server):
             ]
 
     def handle_GET(self, environ, start_response):
-        path = os.path.join(self.dir, self._get_path(environ))
+        # GET also supports /list endpoint, not just /files like other methods.
+        if environ['PATH_INFO'].startswith('/list/'):
+            return self.handle_list(environ, start_response)
+
+        path = os.path.join(self.dir, self.get_path(environ))
 
         if not os.path.isfile(path):
             start_response('404 Not Found', [('Content-Type', 'text/plain')])
@@ -97,7 +106,7 @@ class FiletrackerServer(base.Server):
         return self._fileobj_iterator(open(path, 'rb'))
 
     def handle_HEAD(self, environ, start_response):
-        path = os.path.join(self.dir, self._get_path(environ))
+        path = os.path.join(self.dir, self.get_path(environ))
         if not os.path.isfile(path):
             start_response('404 Not Found', [('Content-Type', 'text/plain')])
             return [('File not found: %s' % path).encode()]
@@ -105,7 +114,7 @@ class FiletrackerServer(base.Server):
         return []
 
     def handle_DELETE(self, environ, start_response):
-        path = self._get_path(environ)
+        path = self.get_path(environ)
         query_params = self.parse_query_params(environ)
         last_modified = query_params.get('last_modified', (None,))[0]
         if last_modified:
@@ -124,6 +133,33 @@ class FiletrackerServer(base.Server):
 
         start_response('200 OK', [])
         return [b'OK']
+
+    def handle_list(self, environ, start_response):
+        path = self.get_path(environ, '/list')
+        query_params = self.parse_query_params(environ)
+
+        last_modified = query_params.get('last_modified', (None,))[0]
+        if not last_modified:
+            last_modified = int(time.time())
+
+        root_dir = os.path.join(self.dir, path)
+        if not os.path.isdir(root_dir):
+            start_response('400 Bad Request', [])
+            return [b'Path doesn\'t exist or is not a directory']
+
+        start_response('200 OK', [])
+        return _list_files_iterator(root_dir, last_modified)
+
+
+def _list_files_iterator(root_dir, version_cutoff):
+    for cur_dir, _, files in os.walk(root_dir):
+        for file_name in files:
+            local_path = os.path.join(root_dir, cur_dir, file_name)
+            ft_relative_path = os.path.relpath(local_path, root_dir)
+
+            mtime = os.lstat(local_path).st_mtime
+            if mtime <= version_cutoff:
+                yield (ft_relative_path + '\n').encode()
 
 
 if __name__ == '__main__':

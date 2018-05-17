@@ -19,11 +19,11 @@ class MigrationFiletrackerServer(FiletrackerServer):
         self.redirect_url = redirect_url
 
     def handle_redirect(self, environ, start_response, present_handler):
-        path = os.path.join(self.dir, self._get_path(environ))
+        path = os.path.join(self.dir, self.get_path(environ))
         if os.path.isfile(path):
             return present_handler(environ, start_response)
 
-        new_url = self.redirect_url + '/' + self._get_path(environ)
+        new_url = self.redirect_url + environ['PATH_INFO']
         start_response('307 Temporary Redirect', [('Location', new_url)])
         return []
 
