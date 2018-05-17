@@ -3,7 +3,7 @@
 import fcntl
 import os
 
-from filetracker.utils import split_name, _check_name, _mkdir
+from filetracker.utils import split_name, check_name, mkdir
 
 
 class LockManager(object):
@@ -76,14 +76,14 @@ class FcntlLockManager(LockManager):
 
     def __init__(self, dir):
         self.dir = dir
-        _mkdir(dir)
+        mkdir(dir)
 
     def lock_for(self, name):
-        _check_name(name)
+        check_name(name)
         name, version = split_name(name)
         path = self.dir + name
         dir = os.path.dirname(path)
-        _mkdir(dir)
+        mkdir(dir)
         return self.FcntlLock(path)
 
 
@@ -105,5 +105,5 @@ class NoOpLockManager(LockManager):
             pass
 
     def lock_for(self, name):
-        _check_name(name)
+        check_name(name)
         return self.NoOpLock()

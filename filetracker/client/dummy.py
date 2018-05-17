@@ -11,7 +11,7 @@ from six import BytesIO
 
 from filetracker.client import Client
 from filetracker.client.data_store import DataStore
-from filetracker.utils import split_name, versioned_name, _check_name
+from filetracker.utils import split_name, versioned_name, check_name
 
 
 class DummyDataStore(DataStore):
@@ -26,7 +26,7 @@ class DummyDataStore(DataStore):
         self.versions = defaultdict(int)
 
     def _parse_name(self, name):
-        _check_name(name)
+        check_name(name)
         key, version = split_name(name)
         return key, version
 

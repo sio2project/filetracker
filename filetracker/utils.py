@@ -34,7 +34,7 @@ def versioned_name(unversioned_name, version):
     return unversioned_name + '@' + str(version)
 
 
-def _check_name(name, allow_version=True):
+def check_name(name, allow_version=True):
     if not isinstance(name, six.string_types):
         raise ValueError("Invalid Filetracker filename: not string: %r" %
                         (name,))
@@ -54,7 +54,7 @@ def _check_name(name, allow_version=True):
                          "in this API call")
 
 
-def _mkdir(name):
+def mkdir(name):
     try:
         os.makedirs(name, 0o700)
     except OSError as e:
@@ -65,7 +65,7 @@ def _mkdir(name):
 _BUFFER_SIZE = 64 * 1024
 
 
-def _file_digest(source):
+def file_digest(source):
     """Calculates SHA256 digest of a file.
 
     Args:

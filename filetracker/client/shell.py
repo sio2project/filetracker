@@ -143,5 +143,6 @@ Supported commands: %s.""" % ', '.join(commands)
     client = Client(remote_url=options.remote_url, cache_dir=options.cache_dir)
     cmd(client, *args[1:])
 
+
 if __name__ == '__main__':
     main()

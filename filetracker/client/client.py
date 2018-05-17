@@ -12,7 +12,7 @@ from filetracker.client import FiletrackerError
 from filetracker.client.local_data_store import LocalDataStore
 from filetracker.client.lock_manager import FcntlLockManager, NoOpLockManager
 from filetracker.client.remote_data_store import RemoteDataStore
-from filetracker.utils import split_name, versioned_name, _check_name
+from filetracker.utils import split_name, versioned_name, check_name
 
 logger = logging.getLogger('filetracker')
 
@@ -272,7 +272,7 @@ class Client(object):
             raise ValueError("Neither to_local_store nor to_remote_store set "
                              "in a call to filetracker.Client.put_file")
 
-        _check_name(name)
+        check_name(name)
 
         lock = None
         if self.local_store:

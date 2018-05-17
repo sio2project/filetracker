@@ -5,7 +5,7 @@ import shutil
 
 from filetracker.client import FiletrackerError
 from filetracker.client.data_store import DataStore
-from filetracker.utils import split_name, versioned_name, _check_name, _mkdir
+from filetracker.utils import split_name, versioned_name, check_name, mkdir
 
 
 class LocalDataStore(DataStore):
@@ -17,10 +17,10 @@ class LocalDataStore(DataStore):
 
     def __init__(self, dir):
         self.dir = os.path.join(dir, 'files')
-        _mkdir(self.dir)
+        mkdir(self.dir)
 
     def _parse_name(self, name):
-        _check_name(name)
+        check_name(name)
         name, version = split_name(name)
         path = self.dir + name
         return path, version
@@ -96,7 +96,7 @@ class LocalDataStore(DataStore):
 def _save_stream(path, stream, version=None):
     dir = os.path.dirname(path)
     if dir:
-        _mkdir(dir)
+        mkdir(dir)
     if os.path.exists(path) and version is not None \
             and _file_version(path) >= version:
         return version

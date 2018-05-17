@@ -37,7 +37,7 @@ import tempfile
 import bsddb3
 import six
 
-from filetracker.utils import _file_digest
+from filetracker.utils import file_digest
 
 
 class FiletrackerFileNotFoundError(Exception):
@@ -128,9 +128,9 @@ class FileStorage(object):
                     # If data was already compressed, we have to decompress it
                     # before calculating the digest.
                     with gzip.open(temp_file_path, 'rb') as compressed_file:
-                        digest = _file_digest(compressed_file)
+                        digest = file_digest(compressed_file)
                 else:
-                    digest = _file_digest(temp_file_path)
+                    digest = file_digest(temp_file_path)
 
             blob_path = self._blob_path(digest)
             
