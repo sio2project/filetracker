@@ -126,25 +126,5 @@ class FiletrackerServer(base.Server):
         return [b'OK']
 
 
-_BUFFER_SIZE = 64 * 1024
-
-
-def _copy_stream(src, dest, length):
-    """Similar to shutil.copyfileobj, but supports limiting data size.
-
-    As for why this is required, refer to
-    https://www.python.org/dev/peps/pep-0333/#input-and-error-streams
-
-    Yes, there are WSGI implementations which do not support EOFs, and
-    believe me, you don't want to debug this.
-    """
-    bytes_left = length
-    while bytes_left > 0:
-        buf_size = min(_BUFFER_SIZE, bytes_left)
-        buf = src.read(buf_size)
-        dest.write(buf)
-        bytes_left -= buf_size
-
-
 if __name__ == '__main__':
     base.main(FiletrackerServer())

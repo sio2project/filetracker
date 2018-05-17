@@ -113,4 +113,4 @@
 # use new paths.
 
 from filetracker.client import Client, dummy
-from filetracker.client.utils import split_name
+from filetracker.utils import split_name

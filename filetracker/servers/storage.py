@@ -29,7 +29,6 @@ import errno
 import email.utils
 import fcntl
 import gzip
-import hashlib
 import os
 import shutil
 import subprocess
@@ -37,6 +36,8 @@ import tempfile
 
 import bsddb3
 import six
+
+from filetracker.utils import file_digest
 
 
 class FiletrackerFileNotFoundError(Exception):
@@ -127,9 +128,9 @@ class FileStorage(object):
                     # If data was already compressed, we have to decompress it
                     # before calculating the digest.
                     with gzip.open(temp_file_path, 'rb') as compressed_file:
-                        digest = _file_digest(compressed_file)
+                        digest = file_digest(compressed_file)
                 else:
-                    digest = _file_digest(temp_file_path)
+                    digest = file_digest(temp_file_path)
 
             blob_path = self._blob_path(digest)
             
@@ -301,29 +302,6 @@ def _path_exists(path):
     """Checks if the path exists
        - is a file, a directory or a symbolic link that may be broken."""
     return os.path.exists(path) or os.path.islink(path)
-
-
-def _file_digest(source):
-    """Calculates SHA256 digest of a file.
-
-    Args:
-        source: either a file-like object or a path to file
-    """
-    hash_sha256 = hashlib.sha256()
-
-    should_close = False
-
-    if isinstance(source, six.string_types):
-        should_close = True
-        source = open(source, 'rb')
-
-    for chunk in iter(lambda: source.read(_BUFFER_SIZE), b''):
-        hash_sha256.update(chunk)
-
-    if should_close:
-        source.close()
-
-    return hash_sha256.hexdigest()
 
 
 def _file_version(path):
