@@ -8,19 +8,13 @@
    Filetracker base supports caching of files downloaded from the remote
    master store.
 
-   Filetracker API allows versioning of the stored files, but its
-   implementation is optional and not provided by default store classes.
-
    -------------------------
    Files, names and versions
    -------------------------
 
-   A file may contain arbitrary data. Each file has a name, which looks like
+   A file may contain arbitrary data. Each file has a name, which is
    an absolute filesystem path (components separated by slashes and the first
-   symbol in the filename must be a slash). Filetracker does not support
-   folders explicitly. At the moment you may assume that a file in filetracker
-   is identified by name which by convention looks like a filesystem path.
-   In the future we may make use of this fact, so please obey.
+   symbol in the filename must be a slash).
 
    Many methods accept or return *versioned names*, which look like regular
    names with version number appended, separated by ``@``. For those methods,
@@ -30,13 +24,14 @@
    Configuration and usage
    -----------------------
 
-   Probably the only class you'd like to know and use is :class:`Client`.
+   Probably the only class you'd like to know and use is
+   :class:`filetracker.client.Client`.
 
-   .. autoclass:: Client
+   .. autoclass:: filetracker.client.Client
        :members:
 
    If you write tests, you may be also interested in
-   :class:`filetracker.dummy.DummyClient`.
+   :class:`filetracker.client.dummy.DummyClient`.
 
    ------------------
    Filetracker server
@@ -73,44 +68,28 @@
        :members:
 
    ----------------------
-   Internal API Reference
+   API Reference
    ----------------------
 
-   .. autofunction:: split_name
+   .. autofunction:: filetracker.utils.split_name
 
-   .. autofunction:: versioned_name
+   .. autofunction:: filetracker.utils.versioned_name
 
-   .. autoclass:: DataStore
+   .. autoclass:: filetracker.client.data_store.DataStore
        :members:
 
-   .. autoclass:: LocalDataStore
+   .. autoclass:: filetracker.client.local_data_store.LocalDataStore
 
-   .. autoclass:: RemoteDataStore
+   .. autoclass:: filetracker.client.remote_data_store.RemoteDataStore
 
-   .. autoclass:: LockManager
+   .. autoclass:: filetracker.client.lock_manager.LockManager
        :members:
 
-   .. autoclass:: FcntlLockManager
+   .. autoclass:: filetracker.client.lock_manager.FcntlLockManager
 
-   .. autoclass:: NoOpLockManager
+   .. autoclass:: filetracker.client.lock_manager.NoOpLockManager
 
-   .. autoclass:: filetracker.dummy.DummyDataStore
+   .. autoclass:: filetracker.client.dummy.DummyDataStore
 
-   .. autoclass:: filetracker.dummy.DummyClient
-
-   ----------------
-   To-dos and ideas
-   ----------------
-    - access control
-    - cache pruning
-    - support for "directories": especially ls
-    - fuse client
-    - rm
+   .. autoclass:: filetracker.client.dummy.DummyClient
 """
-
-# Some symbols from 'client' package are reexported here to prevent
-# breaking oioioi. oioioi.filetracker package should be adapted to
-# use new paths.
-
-from filetracker.client import Client, dummy
-from filetracker.utils import split_name
