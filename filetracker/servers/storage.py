@@ -118,47 +118,44 @@ class FileStorage(object):
                 return _file_version(link_path)
 
             # data is managed by contents now, and shouldn't be used directly
-            contents = _InputStreamWrapper(data, size)
-
-            if digest is None or logical_size is None:
-                contents.save()
-                if compressed:
-                    # This shouldn't occur if the request came from a proper
-                    # filetracker client, so we don't care if it's slow.
-                    with gzip.open(
-                            contents.current_path, 'rb') as decompressed:
-                        digest = file_digest(decompressed)
-                    with gzip.open(
-                            contents.current_path, 'rb') as decompressed:
-                        logical_size = _read_stream_for_size(decompressed)
-                else:
-                    digest = file_digest(contents.current_path)
-                    logical_size = os.stat(contents.current_path).st_size
-
-            blob_path = self._blob_path(digest)
-            
-            with self._lock_blob_with_txn(digest) as txn:
-                digest_bytes = digest.encode()
-
-                link_count = int(self.db.get(digest_bytes, 0, txn=txn))
-                new_count = str(link_count + 1).encode()
-                self.db.put(digest_bytes, new_count, txn=txn)
-
-                # Create a new blob if this isn't a duplicate.
-                if link_count == 0:
-                    _create_file_dirs(blob_path)
-                    self.db.put('{}:logical_size'.format(digest).encode(),
-                                str(logical_size).encode())
-
+            with _InputStreamWrapper(data, size) as contents:
+                if digest is None or logical_size is None:
+                    contents.save()
                     if compressed:
-                        contents.save(blob_path)
+                        # This shouldn't occur if the request came from a proper
+                        # filetracker client, so we don't care if it's slow.
+                        with gzip.open(
+                                contents.current_path, 'rb') as decompressed:
+                            digest = file_digest(decompressed)
+                        with gzip.open(
+                                contents.current_path, 'rb') as decompressed:
+                            logical_size = _read_stream_for_size(decompressed)
                     else:
-                        contents.save()
-                        with open(contents.current_path, 'rb') as raw,\
-                                gzip.open(blob_path, 'wb') as blob:
-                            shutil.copyfileobj(raw, blob)
+                        digest = file_digest(contents.current_path)
+                        logical_size = os.stat(contents.current_path).st_size
 
-                contents.cleanup()
+                blob_path = self._blob_path(digest)
+                
+                with self._lock_blob_with_txn(digest) as txn:
+                    digest_bytes = digest.encode()
+
+                    link_count = int(self.db.get(digest_bytes, 0, txn=txn))
+                    new_count = str(link_count + 1).encode()
+                    self.db.put(digest_bytes, new_count, txn=txn)
+
+                    # Create a new blob if this isn't a duplicate.
+                    if link_count == 0:
+                        _create_file_dirs(blob_path)
+                        self.db.put('{}:logical_size'.format(digest).encode(),
+                                    str(logical_size).encode())
+
+                        if compressed:
+                            contents.save(blob_path)
+                        else:
+                            contents.save()
+                            with open(contents.current_path, 'rb') as raw,\
+                                    gzip.open(blob_path, 'wb') as blob:
+                                shutil.copyfileobj(raw, blob)
 
             if _path_exists(link_path):
                 # Lend the link lock to delete().
@@ -260,13 +257,23 @@ class FileStorage(object):
 
 
 class _InputStreamWrapper(object):
-    """A wrapper for lazy reading and moving contents of 'wsgi.input'."""
-
+    """A wrapper for lazy reading and moving contents of 'wsgi.input'.
+    
+    Should be used as a context manager.
+    """
     def __init__(self, data, size):
         self._data = data
         self._size = size
         self.current_path = None
         self.saved_in_temp = False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, _exc_type, _exc_value, _traceback):
+        """Removes file if it was last saved as a temporary file."""
+        if self.saved_in_temp:
+            os.unlink(self.current_path)
 
     def save(self, new_path=None):
         """Moves or creates the file with stream contents to a new location.
@@ -285,11 +292,6 @@ class _InputStreamWrapper(object):
             with open(new_path, 'wb') as dest:
                 _copy_stream(self._data, dest, self._size)
         self.current_path = new_path
-
-    def cleanup(self):
-        """Removes file if it was last saved as a temporary file."""
-        if self.saved_in_temp:
-            os.unlink(self.current_path)
 
 
 _BUFFER_SIZE = 64 * 1024
