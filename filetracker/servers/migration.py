@@ -6,6 +6,7 @@ from __future__ import print_function
 
 import os.path
 
+from filetracker.servers import base
 from filetracker.servers.files import FiletrackerServer
 
 
@@ -19,11 +20,12 @@ class MigrationFiletrackerServer(FiletrackerServer):
         self.redirect_url = redirect_url
 
     def handle_redirect(self, environ, start_response, present_handler):
-        path = os.path.join(self.dir, self.get_path(environ))
-        if os.path.isfile(path):
+        endpoint, path = base.get_endpoint_and_path(environ)
+
+        if os.path.isfile(os.path.join(self.dir, path)):
             return present_handler(environ, start_response)
 
-        new_url = self.redirect_url + environ['PATH_INFO']
+        new_url = os.path.join(self.redirect_url, endpoint, path)
         start_response('307 Temporary Redirect', [('Location', new_url)])
         return []
 

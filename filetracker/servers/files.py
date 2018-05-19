@@ -29,23 +29,15 @@ class FiletrackerServer(base.Server):
         self.storage = FileStorage(dir)
         self.dir = self.storage.links_dir
 
-    @staticmethod
-    def get_path(environ, expected_endpoint="/files"):
-        path = environ['PATH_INFO']
-        if '..' in path:
-            raise ValueError('Path cannot contain "..".')
-        if not path.startswith(expected_endpoint + '/'):
-            raise ValueError(
-                    'Unsupported endpoint, expected {}/...'
-                    .format(expected_endpoint))
-
-        return path[len(expected_endpoint + '/'):]
-
     def parse_query_params(self, environ):
         return parse_qs(environ.get('QUERY_STRING', ''))
 
     def handle_PUT(self, environ, start_response):
-        path = self.get_path(environ)
+        endpoint, path = base.get_endpoint_and_path(environ)
+        if endpoint != 'files':
+            raise base.HttpError('400 Bad Request',
+                                 'PUT can be only performed on "/files/..."')
+
         content_length = int(environ.get('CONTENT_LENGTH'))
 
         query_params = self.parse_query_params(environ)
@@ -54,8 +46,8 @@ class FiletrackerServer(base.Server):
             last_modified = email.utils.parsedate_tz(last_modified)
             last_modified = email.utils.mktime_tz(last_modified)
         else:
-            start_response('400 Bad Request', [])
-            return [b'last-modified is required']
+            raise base.HttpError('400 Bad Request',
+                                 '"?last-modified=" is required')
 
         compressed = environ.get('HTTP_CONTENT_ENCODING', None) == 'gzip'
 
@@ -68,10 +60,10 @@ class FiletrackerServer(base.Server):
                                      compressed=compressed,
                                      digest=digest)
         start_response('200 OK', [
-                ('Content-Type', 'text/plain'),
-                ('Last-Modified', email.utils.formatdate(version)),
-            ])
-        return [b'OK']
+            ('Content-Type', 'text/plain'),
+            ('Last-Modified', email.utils.formatdate(version)),
+        ])
+        return []
 
     @staticmethod
     def _fileobj_iterator(fileobj, bufsize=65536):
@@ -93,49 +85,64 @@ class FiletrackerServer(base.Server):
             ]
 
     def handle_GET(self, environ, start_response):
-        # GET also supports /list endpoint, not just /files like other methods.
-        if environ['PATH_INFO'].startswith('/list/'):
+        endpoint, path = base.get_endpoint_and_path(environ)
+        if endpoint == 'list':
             return self.handle_list(environ, start_response)
+        elif endpoint == 'files':
+            path = os.path.join(self.dir, path)
 
-        path = os.path.join(self.dir, self.get_path(environ))
+            if not os.path.isfile(path):
+                raise base.HttpError(
+                        '404 Not Found', 'File "{}" not found'.format(path))
 
-        if not os.path.isfile(path):
-            start_response('404 Not Found', [('Content-Type', 'text/plain')])
-            return [('File not found: %s' % path).encode()]
-        start_response('200 OK', self._file_headers(path))
-        return self._fileobj_iterator(open(path, 'rb'))
+            start_response('200 OK', self._file_headers(path))
+            return self._fileobj_iterator(open(path, 'rb'))
+        else:
+            raise base.HttpError(
+                    '400 Bad Request',
+                    'Unknown endpoint "{}", expected "files" or "list"'
+                    .format(endpoint))
 
     def handle_HEAD(self, environ, start_response):
-        path = os.path.join(self.dir, self.get_path(environ))
+        endpoint, path = base.get_endpoint_and_path(environ)
+        if endpoint != 'files':
+            raise base.HttpError('400 Bad Request',
+                                 'HEAD can be only performed on "/files/..."')
+
+        path = os.path.join(self.dir, path)
         if not os.path.isfile(path):
-            start_response('404 Not Found', [('Content-Type', 'text/plain')])
-            return [('File not found: %s' % path).encode()]
+            raise HttpError(
+                    '404 Not Found', 'File "{}" not found'.format(path))
+
         start_response('200 OK', self._file_headers(path))
         return []
 
     def handle_DELETE(self, environ, start_response):
-        path = self.get_path(environ)
+        endpoint, path = base.get_endpoint_and_path(environ)
+        if endpoint != 'files':
+            raise HttpError('400 Bad Request',
+                            'DELETE can be only performed on "/files/..."')
+
         query_params = self.parse_query_params(environ)
         last_modified = query_params.get('last_modified', (None,))[0]
         if last_modified:
             last_modified = email.utils.parsedate_tz(last_modified)
             last_modified = email.utils.mktime_tz(last_modified)
         else:
-            start_response('400 Bad Request', [])
-            return [b'last-modified is required']
+            raise base.HttpError('400 Bad Request',
+                                 '"?last-modified=" is required')
 
         try:
             self.storage.delete(name=path,
                                 version=last_modified)
         except FiletrackerFileNotFoundError:
-            start_response('404 Not Found', [])
-            return []
+            raise base.HttpError('404 Not Found', '')
 
         start_response('200 OK', [])
-        return [b'OK']
+        return []
 
     def handle_list(self, environ, start_response):
-        path = self.get_path(environ, '/list')
+        _, path = base.get_endpoint_and_path(environ)
         query_params = self.parse_query_params(environ)
 
         last_modified = query_params.get('last_modified', (None,))[0]
@@ -144,8 +151,8 @@ class FiletrackerServer(base.Server):
 
         root_dir = os.path.join(self.dir, path)
         if not os.path.isdir(root_dir):
-            start_response('400 Bad Request', [])
-            return [b'Path doesn\'t exist or is not a directory']
+            raise base.HttpError('400 Bad Request',
+                            'Path doesn\'t exist or is not a directory')
 
         start_response('200 OK', [])
         return _list_files_iterator(root_dir, last_modified)

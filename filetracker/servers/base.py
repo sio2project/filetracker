@@ -1,10 +1,20 @@
+"""This module contains an utility superclass for creating WSGI servers."""
+
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
+
 import socket
 import errno
 import os
 import sys
 import traceback
+
+class HttpError(Exception):
+    def __init__(self, status, description):
+        # status should be a string of form '404 Not Found'
+        self.status = status
+        self.description = description
 
 
 class Server(object):
@@ -15,14 +25,51 @@ class Server(object):
         try:
             return getattr(self, 'handle_' + environ['REQUEST_METHOD']) \
                     (environ, start_response)
+        except HttpError as e:
+            response_headers = [
+                ('Content-Type', 'text/plain'),
+                ('X-Exception', e.description)
+            ]
+            start_response(e.status, response_headers, sys.exc_info())
+            return [traceback.format_exc().encode()]
         except Exception as e:
             status = '500 Oops'
             response_headers = [
-                    ('Content-Type', 'text/plain'),
-                    ('X-Exception', str(e))
-                ]
+                ('Content-Type', 'text/plain'),
+                ('X-Exception', str(e))
+            ]
             start_response(status, response_headers, sys.exc_info())
             return [traceback.format_exc().encode()]
+
+
+def get_endpoint_and_path(environ):
+    """Extracts "endpoint" and "path" from the request URL.
+
+    Endpoint is the first path component, and path is the rest. Both
+    of them are without leading slashes.
+    """
+    path = environ['PATH_INFO']
+    if '..' in path:
+        raise HttpError('400 Bad Request', 'Path cannot contain "..".')
+
+    components = path.split('/')
+
+    # Strip closing slash
+    if components and components[-1] == '':
+        components.pop()
+
+    # If path contained '//', get the segment after the last occurence
+    try:
+        first = _rindex(components, '') + 1
+    except ValueError:
+        first = 0
+
+    components = components[first:]
+
+    if len(components) == 0:
+        return '', ''
+    else:
+        return components[0], '/'.join(components[1:])
 
 
 def start_cgi(server):
@@ -59,3 +106,8 @@ def main(server):
             start_fcgi(server)
 
     start_standalone(server)
+
+
+def _rindex(l, value):
+    """Same as str.rindex, but for lists."""
+    return len(l) - l[::-1].index(value) - 1
