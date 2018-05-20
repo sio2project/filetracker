@@ -1,14 +1,20 @@
 sudo: false
 language: python
 python:
-  - "2.7"
-  - "3.6"
+- '2.7'
+- '3.6'
 addons:
   apt:
-    packages:
-      libdb-dev
-      lighttpd
+    packages: libdb-dev
 install: pip install codecov tox-travis
 script: tox
 after_success:
-  - codecov
+- codecov
+deploy:
+  provider: pypi
+  on:
+    branch: master
+    tags: true
+  user: sio2project
+  password:
+    secure: lv6b0WmTC0Ti3J8S0HYHBKgqtD2/jKybPjXZG4noMTKk0PS+G28o0nZwfsJXii+lIKcIbiIoUMJqoD9TktFGfNNpMvZhPnRWWKZezNHksCAN0nbRHZDbbP69z8DdjeN0voPJKf86eatXDxwMiOLePN2v3d4C3pK7wVOUTGcYNPjuwtEzmr3OnvYgfajIBlEAqRfESEmoUENjRrYB5SQimLduNwC0ShC1+MeXa3W8qzRH/6QZPEx7OHWfsyP/FAVwLmCom0ICaEpC4otPFkuIBKAMBNlRB/GF9LlKqsQ4I9zqN9n8xK047i1Nfux0cAfB2A2PxMPjuKv7xYhKkz3aTtMFciDiq3ucAKJK3FTLQScsxKoKGOC4aGZTwMGrb3hnjC0OQ7BNEBKqgcl1YDtCmglIsJSo4Ao+Eot3rE6L3vVJthgsR7K9TFRvM4qp5XMSbpopHcp1wA2VwfB2sv8wfmJrzrQEyj01oh6pncAvOZfg+uRNk2GVSaUZzl7HFa27eSD5nveKdJDF8EXtISd7l71vvIGkLeWljfFKSRDWDHYTHo8eKVNMlLqIKCyzy1EsSe3R/iNKE6fVSfUkf2OP/xX8LuecgXAakYJyHqF/x0wo2nXh+dXiajncRIKUAM/soldQahrF2aGoidInWxk6XiqLX4dj+CLM3e+FLwMm+iI=
