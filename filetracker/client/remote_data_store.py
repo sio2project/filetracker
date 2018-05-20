@@ -59,7 +59,7 @@ class RemoteDataStore(DataStore):
     def _parse_name(self, name):
         check_name(name)
         name, version = split_name(name)
-        url = self.base_url + pathname2url(name)
+        url = self.base_url + '/files' + pathname2url(name)
         return url, version
 
     def _parse_last_modified(self, response):
@@ -155,7 +155,7 @@ class RemoteDataStore(DataStore):
 
     @_verbose_http_errors
     def file_version(self, name):
-        url, version = self._parse_name(name)
+        url, _ = self._parse_name(name)
         response = requests.head(url, allow_redirects=True)
         response.raise_for_status()
         return self._parse_last_modified(response)

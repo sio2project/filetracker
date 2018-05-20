@@ -45,16 +45,17 @@ it's more involved.
 You should have read and become comfortable with the section above, this section only
 describes the differences.
 
-The trick is based on the new `--fallback-url` parameter for the filetracker server. After upgrading the filetracker server, you should configure two servers: the main server which
+The trick is based on the new `--fallback-url` parameter for the filetracker server.
+After upgrading the filetracker server, you should configure two servers: the main server which
 uses the new filetracker code, and the fallback server which is plain lighttpd.
 
 Before starting the new server and the rest of the SIO2 infrastructure, start a lighttpd
-server with a simple configuration for serving static files from `ft_root/files`
+server with a simple configuration for serving static files from `ft_root`
 (port and log path are arbitrary):
 
 ```
 server.tag = "filetracker-old"
-server.document-root = "/path/to/ft_root/files"
+server.document-root = "/path/to/ft_root"
 server.port = 59999
 server.bind = "0.0.0.0"
 server.modules = ( "mod_accesslog", "mod_status" )

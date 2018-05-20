@@ -6,12 +6,12 @@ from __future__ import absolute_import
 
 import multiprocessing
 import os
+from optparse import OptionParser
 import re
 import signal
 import subprocess
 import sys
 import tempfile
-from optparse import OptionParser
 
 from filetracker.servers.files import FiletrackerServer
 from filetracker.servers.migration import MigrationFiletrackerServer
