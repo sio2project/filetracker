@@ -9,7 +9,7 @@ A simple file storage module for distributed systems.
 Filetracker has a client-server architecture: the server is the primary
 storage, and every client may have its own cache. Client has a Python
 API, and can be also invoked from the shell. Interaction between client
-and server is based on a simple HTTP API (Filetracker protocol).
+and server is based on a simple HTTP API ([Filetracker protocol](PROTOCOL.md)).
 
 Files are stored on the server compressed and deduplicated. A peculiar
 versioning scheme is supported: files are versioned by their modification
