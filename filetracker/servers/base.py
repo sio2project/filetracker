@@ -10,6 +10,7 @@ import os
 import sys
 import traceback
 
+
 class HttpError(Exception):
     def __init__(self, status, description):
         # status should be a string of form '404 Not Found'

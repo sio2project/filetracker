@@ -27,8 +27,22 @@ class MigrationFiletrackerServer(FiletrackerServer):
 
         new_url = self.redirect_url + '/' + endpoint + '/' + path
         start_response('307 Temporary Redirect', [('Location', new_url)])
-        return []
+        return _EmptyCloseableIterator()
 
     def handle_GET(self, environ, start_response):
         handler = super(MigrationFiletrackerServer, self).handle_GET
         return self.handle_redirect(environ, start_response, handler)
+
+
+class _EmptyCloseableIterator(object):
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return self.next()
+
+    def next(self):
+        raise StopIteration()
+
+    def close(self):
+        pass

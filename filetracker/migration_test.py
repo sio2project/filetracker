@@ -105,6 +105,17 @@ class MigrationTest(unittest.TestCase):
         f = self.client.get_stream('/fallback.txt')[0]
         self.assertEqual(f.read(), b'remote hello')
 
+    def test_file_version_should_return_version_from_fallback(self):
+        temp_file = os.path.join(self.temp_dir, 'fallback_version.txt')
+        with open(temp_file, 'w') as tf:
+            tf.write('fallback version')
+
+        timestamp = int(time.time())
+        self.fallback_client.put_file('/fallback_version.txt', temp_file)
+
+        self.assertGreaterEqual(
+                self.client.file_version('/fallback_version.txt'), timestamp)
+
     def test_file_version_of_not_existent_file_should_return_404(self):
         with self.assertRaisesRegexp(FiletrackerError, "404"):
             self.client.get_stream('/nonexistent.txt')
