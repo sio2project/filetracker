@@ -103,20 +103,6 @@ class FiletrackerServer(base.Server):
                     'Unknown endpoint "{}", expected "files" or "list"'
                     .format(endpoint))
 
-    def handle_HEAD(self, environ, start_response):
-        endpoint, path = base.get_endpoint_and_path(environ)
-        if endpoint != 'files':
-            raise base.HttpError('400 Bad Request',
-                                 'HEAD can be only performed on "/files/..."')
-
-        path = os.path.join(self.dir, path)
-        if not os.path.isfile(path):
-            raise HttpError(
-                    '404 Not Found', 'File "{}" not found'.format(path))
-
-        start_response('200 OK', self._file_headers(path))
-        return []
-
     def handle_DELETE(self, environ, start_response):
         endpoint, path = base.get_endpoint_and_path(environ)
         if endpoint != 'files':

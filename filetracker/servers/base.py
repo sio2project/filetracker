@@ -23,8 +23,15 @@ class Server(object):
 
     def __call__(self, environ, start_response):
         try:
-            return getattr(self, 'handle_' + environ['REQUEST_METHOD']) \
-                    (environ, start_response)
+            if environ['REQUEST_METHOD'] == 'HEAD':
+                environ['REQUEST_METHOD'] = 'GET'
+                _body_iter = self.__call__(environ, start_response)
+                return []
+            else:
+                handler = getattr(
+                        self, 'handle_{}'.format(environ['REQUEST_METHOD']))
+                return handler(environ, start_response)
+
         except HttpError as e:
             response_headers = [
                 ('Content-Type', 'text/plain'),
