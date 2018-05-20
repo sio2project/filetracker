@@ -32,7 +32,3 @@ class MigrationFiletrackerServer(FiletrackerServer):
     def handle_GET(self, environ, start_response):
         handler = super(MigrationFiletrackerServer, self).handle_GET
         return self.handle_redirect(environ, start_response, handler)
-
-    def handle_HEAD(self, environ, start_response):
-        handler = super(MigrationFiletrackerServer, self).handle_HEAD
-        return self.handle_redirect(environ, start_response, handler)

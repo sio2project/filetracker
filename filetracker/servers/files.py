@@ -65,15 +65,6 @@ class FiletrackerServer(base.Server):
         ])
         return []
 
-    @staticmethod
-    def _fileobj_iterator(fileobj, bufsize=65536):
-        while True:
-            data = fileobj.read(bufsize)
-            if not data:
-                fileobj.close()
-                return
-            yield data
-
     def _file_headers(self, path):
         link_st = os.lstat(path)
         blob_st = os.stat(path)
@@ -96,7 +87,7 @@ class FiletrackerServer(base.Server):
                         '404 Not Found', 'File "{}" not found'.format(path))
 
             start_response('200 OK', self._file_headers(path))
-            return self._fileobj_iterator(open(path, 'rb'))
+            return _FileIterator(open(path, 'rb'))
         else:
             raise base.HttpError(
                     '400 Bad Request',
@@ -142,6 +133,31 @@ class FiletrackerServer(base.Server):
 
         start_response('200 OK', [])
         return _list_files_iterator(root_dir, last_modified)
+
+
+class _FileIterator(object):
+    """File iterator that supports early closing."""
+    def __init__(self, fileobj, bufsize=65536):
+        self.fileobj = fileobj
+        self.bufsize = bufsize
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return self.next()
+
+    def next(self):
+        data = self.fileobj.read(self.bufsize)
+        if data:
+            return data
+        else:
+            self.fileobj.close()
+            raise StopIteration()
+
+    def close(self):
+        """Iterator becomes invalid after call to this method."""
+        self.fileobj.close()
 
 
 def _list_files_iterator(root_dir, version_cutoff):

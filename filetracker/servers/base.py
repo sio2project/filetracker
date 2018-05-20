@@ -26,6 +26,10 @@ class Server(object):
             if environ['REQUEST_METHOD'] == 'HEAD':
                 environ['REQUEST_METHOD'] = 'GET'
                 _body_iter = self.__call__(environ, start_response)
+                # Server implementations should return closeable iterators
+                # from handle_GET to avoid resource leaks.
+                _body_iter.close()
+
                 return []
             else:
                 handler = getattr(
