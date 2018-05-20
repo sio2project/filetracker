@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 setup(
     name = 'filetracker',
-    version = '1.1.0',
+    version = '2.0',
     author = 'SIO2 Project Team',
     author_email = 'sio2@sio2project.mimuw.edu.pl',
     description = 'Filetracker caching file storage',
