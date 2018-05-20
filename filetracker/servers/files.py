@@ -52,27 +52,31 @@ class FiletrackerServer(base.Server):
         compressed = environ.get('HTTP_CONTENT_ENCODING', None) == 'gzip'
 
         digest = environ.get('HTTP_SHA256_CHECKSUM', None)
+        logical_size = environ.get('HTTP_LOGICAL_SIZE', None)
 
         version = self.storage.store(name=path,
                                      data=environ['wsgi.input'],
                                      version=last_modified,
                                      size=content_length,
                                      compressed=compressed,
-                                     digest=digest)
+                                     digest=digest,
+                                     logical_size=logical_size)
         start_response('200 OK', [
             ('Content-Type', 'text/plain'),
             ('Last-Modified', email.utils.formatdate(version)),
         ])
         return []
 
-    def _file_headers(self, path):
-        link_st = os.lstat(path)
-        blob_st = os.stat(path)
+    def _file_headers(self, name):
+        link_st = os.lstat(os.path.join(self.dir, name))
+        blob_st = os.stat(os.path.join(self.dir, name))
+        logical_size = self.storage.logical_size(name)
         return [
-                ('Last-Modified', email.utils.formatdate(link_st.st_mtime)),
                 ('Content-Type', 'application/octet-stream'),
                 ('Content-Length', str(blob_st.st_size)),
-                ('Content-Encoding', 'gzip')
+                ('Content-Encoding', 'gzip'),
+                ('Last-Modified', email.utils.formatdate(link_st.st_mtime)),
+                ('Logical-Size', str(logical_size)),
             ]
 
     def handle_GET(self, environ, start_response):

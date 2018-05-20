@@ -96,6 +96,7 @@ def main():
     processed_blobs = 0
     broken_blobs = 0
 
+    # TODO this script should be updated to recalculate file logical sizes.
     with progress_bar.conditional(show=not silent,
                                   widgets=blobs_widgets) as bar:
         for cur_dir, _, files in os.walk(file_storage.blobs_dir):

@@ -125,6 +125,16 @@ class InteractionTest(unittest.TestCase):
         self.assertNotEqual(version, 1)
         self.assertTrue(pre_upload <= version <= post_upload)
 
+    def test_file_size_should_return_decompressed_size_without_cache(self):
+        src_file = os.path.join(self.temp_dir, 'size.txt')
+        with open(src_file, 'wb') as sf:
+            sf.write(b'hello size')     # size = 10
+
+        self.client.put_file('/size.txt', src_file, to_local_store=False)
+
+        self.assertEqual(
+                self.client.file_size('/size.txt'), len(b'hello size'))
+
     def test_every_link_should_have_independent_version(self):
         src_file = os.path.join(self.temp_dir, 'foo.txt')
         with open(src_file, 'wb') as sf:

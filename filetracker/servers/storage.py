@@ -79,7 +79,8 @@ class FileStorage(object):
         self.db.close()
         self.db_env.close()
 
-    def store(self, name, data, version, size=0, compressed=False, digest=None):
+    def store(self, name, data, version, size=0,
+              compressed=False, digest=None, logical_size=None):
         """Adds a new file to the storage.
         
         If the file with the same name existed before, it's not
@@ -108,62 +109,53 @@ class FileStorage(object):
             digest: SHA256 digest of the file before compression
                 If specified, the digest will not be computed again, saving
                 resources.
+            logical_size: if ``data`` is gzip-compressed, this parameter
+                has to be set to decompressed file size.
         """
         with _exclusive_lock(self._lock_path('links', name)):
             link_path = self._link_path(name)
             if _path_exists(link_path) and _file_version(link_path) > version:
                 return _file_version(link_path)
 
-            # Path to temporary file that may be created in some cases.
-            temp_file_path = None
-
-            if digest is None:
-                # Write data to temp file and calculate hash.
-                temp_file_fd, temp_file_path = tempfile.mkstemp()
-                temp_file = os.fdopen(temp_file_fd, 'wb')
-                _copy_stream(data, temp_file, size)
-                temp_file.close()
-
-                if compressed:
-                    # If data was already compressed, we have to decompress it
-                    # before calculating the digest.
-                    with gzip.open(temp_file_path, 'rb') as compressed_file:
-                        digest = file_digest(compressed_file)
-                else:
-                    digest = file_digest(temp_file_path)
-
-            blob_path = self._blob_path(digest)
-            
-            with self._lock_blob_with_txn(digest) as txn:
-                digest_bytes = digest.encode('utf8')
-                try:
-                    link_count = int(self.db.get(digest_bytes, 0, txn=txn))
-                except KeyError:
-                    link_count = 0
-
-                new_count = str(link_count + 1).encode('utf8')
-                self.db.put(digest_bytes, new_count, txn=txn)
-
-                if link_count == 0:
-                    # Create a new blob.
-                    _create_file_dirs(blob_path)
+            # data is managed by contents now, and shouldn't be used directly
+            with _InputStreamWrapper(data, size) as contents:
+                if digest is None or logical_size is None:
+                    contents.save()
                     if compressed:
-                        if temp_file_path:
-                            shutil.move(temp_file_path, blob_path)
-                        else:
-                            with open(blob_path, 'wb') as blob:
-                                _copy_stream(data, blob, size)
+                        # This shouldn't occur if the request came from a proper
+                        # filetracker client, so we don't care if it's slow.
+                        with gzip.open(
+                                contents.current_path, 'rb') as decompressed:
+                            digest = file_digest(decompressed)
+                        with gzip.open(
+                                contents.current_path, 'rb') as decompressed:
+                            logical_size = _read_stream_for_size(decompressed)
                     else:
-                        if temp_file_path:
-                            with open(temp_file_path, 'rb') as raw,\
+                        digest = file_digest(contents.current_path)
+                        logical_size = os.stat(contents.current_path).st_size
+
+                blob_path = self._blob_path(digest)
+                
+                with self._lock_blob_with_txn(digest) as txn:
+                    digest_bytes = digest.encode()
+
+                    link_count = int(self.db.get(digest_bytes, 0, txn=txn))
+                    new_count = str(link_count + 1).encode()
+                    self.db.put(digest_bytes, new_count, txn=txn)
+
+                    # Create a new blob if this isn't a duplicate.
+                    if link_count == 0:
+                        _create_file_dirs(blob_path)
+                        self.db.put('{}:logical_size'.format(digest).encode(),
+                                    str(logical_size).encode())
+
+                        if compressed:
+                            contents.save(blob_path)
+                        else:
+                            contents.save()
+                            with open(contents.current_path, 'rb') as raw,\
                                     gzip.open(blob_path, 'wb') as blob:
                                 shutil.copyfileobj(raw, blob)
-                        else:
-                            with gzip.open(blob_path, 'wb') as blob:
-                                _copy_stream(data, blob, size)
-
-                if temp_file_path and os.path.exists(temp_file_path):
-                    os.unlink(temp_file_path)
 
             if _path_exists(link_path):
                 # Lend the link lock to delete().
@@ -206,28 +198,33 @@ class FileStorage(object):
             digest = self._digest_for_link(name)
             with self._lock_blob_with_txn(digest) as txn:
                 os.unlink(link_path)
-                digest_bytes = digest.encode('utf8')
+                digest_bytes = digest.encode()
                 link_count = self.db.get(digest_bytes, txn=txn)
                 if link_count is None:
                     raise RuntimeError("File exists but has no key in db")
                 link_count = int(link_count)
                 if link_count == 1:
                     self.db.delete(digest_bytes, txn=txn)
+                    self.db.delete(
+                            '{}:logical_size'.format(digest).encode(), txn=txn)
                     os.unlink(self._blob_path(digest))
                 else:
-                    new_count = str(link_count - 1).encode('utf8')
+                    new_count = str(link_count - 1).encode()
                     self.db.put(digest_bytes, new_count, txn=txn)
         return True
 
     def stored_version(self, name):
-        """
-        Returns the version of file `name` that is currently stored
-        or None if it doesn't exist.
-        """
+        """Returns the version of file `name` or None if it doesn't exist."""
         link_path = self._link_path(name)
         if not _path_exists(link_path):
             return None
         return _file_version(link_path)
+
+    def logical_size(self, name):
+        """Returns the logical size (before compression) of file `name`."""
+        digest = self._digest_for_link(name)
+        return int(self.db.get('{}:logical_size'
+            .format(digest).encode()).decode())
 
     def _link_path(self, name):
         return os.path.join(self.links_dir, name)
@@ -261,6 +258,44 @@ class FileStorage(object):
         return digest
 
 
+class _InputStreamWrapper(object):
+    """A wrapper for lazy reading and moving contents of 'wsgi.input'.
+    
+    Should be used as a context manager.
+    """
+    def __init__(self, data, size):
+        self._data = data
+        self._size = size
+        self.current_path = None
+        self.saved_in_temp = False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, _exc_type, _exc_value, _traceback):
+        """Removes file if it was last saved as a temporary file."""
+        if self.saved_in_temp:
+            os.unlink(self.current_path)
+
+    def save(self, new_path=None):
+        """Moves or creates the file with stream contents to a new location.
+
+        Args:
+            new_path: path to move to, if None a temporary file is created.
+        """
+        self.saved_in_temp = new_path is None
+        if new_path is None:
+            fd, new_path = tempfile.mkstemp()
+            os.close(fd)
+
+        if self.current_path:
+            shutil.move(self.current_path, new_path)
+        else:
+            with open(new_path, 'wb') as dest:
+                _copy_stream(self._data, dest, self._size)
+        self.current_path = new_path
+
+
 _BUFFER_SIZE = 64 * 1024
 
 
@@ -290,6 +325,17 @@ def _copy_stream(src, dest, length=0):
         buf = src.read(buf_size)
         dest.write(buf)
         bytes_left -= buf_size
+
+
+def _read_stream_for_size(stream):
+    """Reads a stream discarding the data read and returns its size."""
+    size = 0
+    while True:
+        buf = stream.read(_BUFFER_SIZE)
+        size += len(buf)
+        if not buf:
+            break
+    return size
 
 
 def _create_file_dirs(file_path):
