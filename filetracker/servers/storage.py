@@ -198,16 +198,18 @@ class FileStorage(object):
             digest = self._digest_for_link(name)
             with self._lock_blob_with_txn(digest) as txn:
                 os.unlink(link_path)
-                digest_bytes = digest.encode('utf8')
+                digest_bytes = digest.encode()
                 link_count = self.db.get(digest_bytes, txn=txn)
                 if link_count is None:
                     raise RuntimeError("File exists but has no key in db")
                 link_count = int(link_count)
                 if link_count == 1:
                     self.db.delete(digest_bytes, txn=txn)
+                    self.db.delete(
+                            '{}:logical_size'.format(digest).encode(), txn=txn)
                     os.unlink(self._blob_path(digest))
                 else:
-                    new_count = str(link_count - 1).encode('utf8')
+                    new_count = str(link_count - 1).encode()
                     self.db.put(digest_bytes, new_count, txn=txn)
         return True
 
