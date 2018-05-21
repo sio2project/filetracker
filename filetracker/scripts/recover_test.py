@@ -35,8 +35,8 @@ class RecoveryScriptTest(unittest.TestCase):
 
         storage = FileStorage(self.temp_dir)
 
-        self.assertTrue(storage.db.get(b'0000', 1))
-        self.assertTrue(storage.db.get(b'0000:logical_size', 5))
+        self.assertEqual(storage.db.get(b'0000'), b'1')
+        self.assertEqual(storage.db.get(b'0000:logical_size'), b'5')
 
     def test_should_remove_broken_links(self):
         _touch_hello_gz(os.path.join(self.temp_dir, 'blobs', '00', '0000'))
