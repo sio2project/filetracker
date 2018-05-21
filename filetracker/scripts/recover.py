@@ -113,7 +113,7 @@ def main():
                 size_key = '{}:logical_size'.format(blob_name).encode()
                 if not db.has_key(size_key) or full:
                     blob_path = os.path.join(cur_dir, blob_name)
-                    with gzip.open(os.path.join(blob_path), 'rb') as zf:
+                    with gzip.open(blob_path, 'rb') as zf:
                         logical_size = _read_stream_for_size(zf)
 
                     db.put(size_key, str(logical_size).encode())
