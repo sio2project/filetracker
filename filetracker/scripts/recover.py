@@ -32,7 +32,7 @@ this while storage is being used by a filetracker server.
 _ACTION_LENGTH = 25
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=_DESCRIPTION)
     parser.add_argument('root', help='root directory of filetracker storage')
     parser.add_argument('-s', '--silent', action='store_true',
@@ -41,7 +41,7 @@ def main():
             help='if set, logical size of all blobs is recalculated '
                  '(this may take a lot of time)')
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     root = args.root
     silent = args.silent
     full = args.full
@@ -109,6 +109,7 @@ def main():
                 if blob_name not in blob_links:
                     os.unlink(os.path.join(cur_dir, blob_name))
                     broken_blobs += 1
+                    continue
 
                 size_key = '{}:logical_size'.format(blob_name).encode()
                 if not db.has_key(size_key) or full:
