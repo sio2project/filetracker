@@ -238,8 +238,13 @@ class FileStorage(object):
     def logical_size(self, name):
         """Returns the logical size (before compression) of file `name`."""
         digest = self._digest_for_link(name)
-        return int(self.db.get('{}:logical_size'
-            .format(digest).encode()).decode())
+        logical_size = self.db.get('{}:logical_size'.format(digest).encode())
+
+        if logical_size:
+            return int(logical_size.decode())
+        else:
+            raise RuntimeError(
+                    'Blob doesn\'t have :logical_size in DB: try recovering')
 
     def _link_path(self, name):
         return os.path.join(self.links_dir, name)
