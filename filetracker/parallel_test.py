@@ -43,6 +43,11 @@ class ParallelTest(unittest.TestCase):
             client = Client(
                     local_store=None,
                     remote_url='http://127.0.0.1:{}'.format(_TEST_PORT_NUMBER))
+
+            # A hack to avoid negotiating version (making a request), because
+            # it slows down client spawn time significantly.
+            client.remote_store._protocol_ver = 2
+
             cls.clients.append(client)
 
     @classmethod
