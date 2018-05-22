@@ -129,6 +129,7 @@ def main(args=None):
 
 
 def db_init(db_dir):
+    print('Attempting to create and init database', file=sys.stderr)
     mkdir(db_dir)
     db_env = bsddb3.db.DBEnv()
     db_env.open(
@@ -141,6 +142,7 @@ def db_init(db_dir):
             | bsddb3.db.DB_REGISTER
             | bsddb3.db.DB_RECOVER)
     db_env.close()
+    print('Successfully created and initted database', file=sys.stderr)
 
 
 # This filetracker_instance is cached between requests within one WSGI process.
