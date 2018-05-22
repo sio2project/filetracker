@@ -72,7 +72,8 @@ def main(args=None):
         |bind = ['{listen_on}:{port}']
         |daemon = {daemonize}
         |workers = {workers}
-        |raw_env = ['FILETRACKER_DIR={filetracker_dir}', 
+        |worker_class = 'gevent'
+        |raw_env = ['FILETRACKER_DIR={filetracker_dir}',
         |           'FILETRACKER_FALLBACK_URL={fallback_url}']
         """.format(
         listen_on=options.listen_on,
