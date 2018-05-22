@@ -87,14 +87,14 @@ class FiletrackerServer(base.Server):
         elif endpoint == 'version':
             return self.handle_version(environ, start_response)
         elif endpoint == 'files':
-            path = os.path.join(self.dir, path)
+            full_path = os.path.join(self.dir, path)
 
-            if not os.path.isfile(path):
-                raise base.HttpError(
-                        '404 Not Found', 'File "{}" not found'.format(path))
+            if not os.path.isfile(full_path):
+                raise base.HttpError('404 Not Found',
+                                     'File "{}" not found'.format(full_path))
 
             start_response('200 OK', self._file_headers(path))
-            return _FileIterator(open(path, 'rb'))
+            return _FileIterator(open(full_path, 'rb'))
         else:
             raise base.HttpError(
                     '400 Bad Request',
