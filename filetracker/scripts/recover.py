@@ -5,6 +5,7 @@ from __future__ import division
 from __future__ import print_function
 
 import argparse
+import gzip
 import os
 import sys
 
@@ -31,14 +32,19 @@ this while storage is being used by a filetracker server.
 _ACTION_LENGTH = 25
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=_DESCRIPTION)
     parser.add_argument('root', help='root directory of filetracker storage')
     parser.add_argument('-s', '--silent', action='store_true',
             help='if set, progress bar is not printed')
+    parser.add_argument('-f', '--full', action='store_true',
+            help='if set, logical size of all blobs is recalculated '
+                 '(this may take a lot of time)')
 
-    args = parser.parse_args()
-    root, silent = args.root, args.silent
+    args = parser.parse_args(argv)
+    root = args.root
+    silent = args.silent
+    full = args.full
 
     ensure_storage_format(root)
 
@@ -84,7 +90,7 @@ def main():
                 bar.update(processed_links)
 
     for digest, link_count in six.iteritems(blob_links):
-        db.put(digest.encode('utf8'), str(link_count).encode('utf8'))
+        db.put(digest.encode(), str(link_count).encode())
 
     blobs_widgets = [
             ' [', progress_bar.Timer(format='Time: %(elapsed)s'), '] ',
@@ -96,7 +102,6 @@ def main():
     processed_blobs = 0
     broken_blobs = 0
 
-    # TODO this script should be updated to recalculate file logical sizes.
     with progress_bar.conditional(show=not silent,
                                   widgets=blobs_widgets) as bar:
         for cur_dir, _, files in os.walk(file_storage.blobs_dir):
@@ -104,6 +109,15 @@ def main():
                 if blob_name not in blob_links:
                     os.unlink(os.path.join(cur_dir, blob_name))
                     broken_blobs += 1
+                    continue
+
+                size_key = '{}:logical_size'.format(blob_name).encode()
+                if not db.has_key(size_key) or full:
+                    blob_path = os.path.join(cur_dir, blob_name)
+                    with gzip.open(blob_path, 'rb') as zf:
+                        logical_size = _read_stream_for_size(zf)
+
+                    db.put(size_key, str(logical_size).encode())
 
                 processed_blobs += 1
                 bar.update(processed_blobs)
@@ -129,6 +143,17 @@ def ensure_storage_format(root_dir):
     if not os.path.isdir(os.path.join(root_dir, 'db')):
         print('"db/" directory not found')
         sys.exit(1)
+
+
+def _read_stream_for_size(stream, buf_size=65536):
+    """Reads a stream discarding the data read and returns its size."""
+    size = 0
+    while True:
+        buf = stream.read(buf_size)
+        size += len(buf)
+        if not buf:
+            break
+    return size
 
 
 if __name__ == '__main__':
