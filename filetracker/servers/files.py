@@ -5,6 +5,7 @@ from __future__ import division
 from __future__ import print_function
 
 import email.utils
+import json
 import os.path
 import time
 
@@ -83,15 +84,17 @@ class FiletrackerServer(base.Server):
         endpoint, path = base.get_endpoint_and_path(environ)
         if endpoint == 'list':
             return self.handle_list(environ, start_response)
+        elif endpoint == 'version':
+            return self.handle_version(environ, start_response)
         elif endpoint == 'files':
-            path = os.path.join(self.dir, path)
+            full_path = os.path.join(self.dir, path)
 
-            if not os.path.isfile(path):
-                raise base.HttpError(
-                        '404 Not Found', 'File "{}" not found'.format(path))
+            if not os.path.isfile(full_path):
+                raise base.HttpError('404 Not Found',
+                                     'File "{}" not found'.format(full_path))
 
             start_response('200 OK', self._file_headers(path))
-            return _FileIterator(open(path, 'rb'))
+            return _FileIterator(open(full_path, 'rb'))
         else:
             raise base.HttpError(
                     '400 Bad Request',
@@ -137,6 +140,13 @@ class FiletrackerServer(base.Server):
 
         start_response('200 OK', [])
         return _list_files_iterator(root_dir, last_modified)
+
+    def handle_version(self, environ, start_response):
+        start_response('200 OK', [('Content-Type', 'application/json')])
+        response = {
+                'protocol_versions': [2],
+        }
+        return [json.dumps(response).encode('utf8')]
 
 
 class _FileIterator(object):
