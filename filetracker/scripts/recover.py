@@ -13,6 +13,7 @@ import six
 
 from filetracker.scripts import progress_bar
 from filetracker.servers.storage import FileStorage
+from filetracker.servers.run import db_init
 
 _DESCRIPTION = """
 Restores storage consistency after failures.
@@ -47,6 +48,7 @@ def main(argv=None):
     full = args.full
 
     ensure_storage_format(root)
+    db_init(os.path.join(root, 'db'))
 
     # Create a FileStorage object to use the same db settings as usual
     file_storage = FileStorage(root)
