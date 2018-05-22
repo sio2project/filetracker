@@ -246,7 +246,6 @@ class RemoteDataStore(DataStore):
                     .format(_PROTOCOL_CAPABILITIES, server_versions))
 
         self._protocol_ver = max(common_versions)
-        import sys
         print('Settled for protocol version {}'.format(self._protocol_ver))
 
         return self._protocol_ver
