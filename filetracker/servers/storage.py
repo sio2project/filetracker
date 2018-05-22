@@ -136,18 +136,23 @@ class FileStorage(object):
 
                 blob_path = self._blob_path(digest)
                 
-                with self._lock_blob_with_txn(digest) as txn:
+                with _exclusive_lock(self._lock_path('blobs', digest)):
                     digest_bytes = digest.encode()
 
-                    link_count = int(self.db.get(digest_bytes, 0, txn=txn))
-                    new_count = str(link_count + 1).encode()
-                    self.db.put(digest_bytes, new_count, txn=txn)
+                    with self._db_transaction() as txn:
+                        link_count = int(self.db.get(digest_bytes, 0, txn=txn))
+                        new_count = str(link_count + 1).encode()
+                        self.db.put(digest_bytes, new_count, txn=txn)
+
+                        if link_count == 0:
+                            self.db.put(
+                                    '{}:logical_size'.format(digest).encode(),
+                                    str(logical_size).encode(),
+                                    txn=txn)
 
                     # Create a new blob if this isn't a duplicate.
                     if link_count == 0:
                         _create_file_dirs(blob_path)
-                        self.db.put('{}:logical_size'.format(digest).encode(),
-                                    str(logical_size).encode())
 
                         if compressed:
                             contents.save(blob_path)
@@ -195,22 +200,32 @@ class FileStorage(object):
                 raise FiletrackerFileNotFoundError
             if _file_version(link_path) > version:
                 return False
+
             digest = self._digest_for_link(name)
-            with self._lock_blob_with_txn(digest) as txn:
+
+            with _exclusive_lock(self._lock_path('blobs', digest)):
+                should_delete_blob = False
+
+                with self._db_transaction() as txn:
+                    digest_bytes = digest.encode()
+                    link_count = self.db.get(digest_bytes, txn=txn)
+                    if link_count is None:
+                        raise RuntimeError("File exists but has no key in db")
+                    link_count = int(link_count)
+                    if link_count == 1:
+                        self.db.delete(digest_bytes, txn=txn)
+                        self.db.delete(
+                                '{}:logical_size'.format(digest).encode(),
+                                txn=txn)
+                        should_delete_blob = True
+                    else:
+                        new_count = str(link_count - 1).encode()
+                        self.db.put(digest_bytes, new_count, txn=txn)
+
                 os.unlink(link_path)
-                digest_bytes = digest.encode()
-                link_count = self.db.get(digest_bytes, txn=txn)
-                if link_count is None:
-                    raise RuntimeError("File exists but has no key in db")
-                link_count = int(link_count)
-                if link_count == 1:
-                    self.db.delete(digest_bytes, txn=txn)
-                    self.db.delete(
-                            '{}:logical_size'.format(digest).encode(), txn=txn)
+                if should_delete_blob:
                     os.unlink(self._blob_path(digest))
-                else:
-                    new_count = str(link_count - 1).encode()
-                    self.db.put(digest_bytes, new_count, txn=txn)
+
         return True
 
     def stored_version(self, name):
@@ -223,8 +238,13 @@ class FileStorage(object):
     def logical_size(self, name):
         """Returns the logical size (before compression) of file `name`."""
         digest = self._digest_for_link(name)
-        return int(self.db.get('{}:logical_size'
-            .format(digest).encode()).decode())
+        logical_size = self.db.get('{}:logical_size'.format(digest).encode())
+
+        if logical_size:
+            return int(logical_size.decode())
+        else:
+            raise RuntimeError(
+                    'Blob doesn\'t have :logical_size in DB: try recovering')
 
     def _link_path(self, name):
         return os.path.join(self.links_dir, name)
@@ -236,15 +256,10 @@ class FileStorage(object):
         return os.path.join(self.locks_dir, *path_parts)
 
     @contextlib.contextmanager
-    def _lock_blob_with_txn(self, digest):
-        """A wrapper for ``_exclusive_lock`` that also handles DB transactions.
-
-        Returns: DBTxn object
-        """
+    def _db_transaction(self):
         txn = self.db_env.txn_begin()
         try:
-            with _exclusive_lock(self._lock_path('blobs', digest)):
-                yield txn
+            yield txn
         except:
             txn.abort()
             raise

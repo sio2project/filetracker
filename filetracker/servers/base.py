@@ -50,6 +50,8 @@ class Server(object):
                 ('Content-Type', 'text/plain'),
                 ('X-Exception', str(e))
             ]
+            # We have an uncaught exception so it is useful to know its stacktrace.
+            print(traceback.format_exc(), file=sys.stderr)
             start_response(status, response_headers, sys.exc_info())
             return [traceback.format_exc().encode()]
 

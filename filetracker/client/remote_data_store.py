@@ -61,7 +61,8 @@ def _verbose_http_errors(fn):
 
             code = e.response.status_code
             message = e.response.headers.get('x-exception', str(e))
-            raise FiletrackerError('HTTP/%d: %s' % (code, message))
+            stacktrace = e.response.text
+            raise FiletrackerError('HTTP/%d: %s\n%s' % (code, message, stacktrace))
 
     return wrapped
 
