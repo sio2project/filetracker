@@ -83,6 +83,8 @@ class FiletrackerServer(base.Server):
         endpoint, path = base.get_endpoint_and_path(environ)
         if endpoint == 'list':
             return self.handle_list(environ, start_response)
+        elif endpoint == 'version':
+            return self.handle_version(environ, start_response)
         elif endpoint == 'files':
             path = os.path.join(self.dir, path)
 
@@ -137,6 +139,13 @@ class FiletrackerServer(base.Server):
 
         start_response('200 OK', [])
         return _list_files_iterator(root_dir, last_modified)
+
+    def handle_version(self, environ, start_response):
+        start_response('200 OK', [('Content-Type', 'application/json')])
+        response = {
+                'protocol_versions': [2],
+        }
+        return [json.dumps(response).encode('utf8')]
 
 
 class _FileIterator(object):
