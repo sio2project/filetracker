@@ -25,13 +25,14 @@ from __future__ import division
 from __future__ import print_function
 
 import contextlib
-import errno
 import email.utils
+import errno
 import fcntl
 import gzip
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 
 import bsddb3
@@ -61,13 +62,18 @@ class FileStorage(object):
 
         # https://docs.oracle.com/cd/E17076_05/html/programmer_reference/transapp_env_open.html
         self.db_env = bsddb3.db.DBEnv()
-        self.db_env.open(
-                self.db_dir,
-                bsddb3.db.DB_CREATE
-                | bsddb3.db.DB_INIT_LOCK
-                | bsddb3.db.DB_INIT_LOG
-                | bsddb3.db.DB_INIT_MPOOL
-                | bsddb3.db.DB_INIT_TXN)
+        try:
+            self.db_env.open(
+                    self.db_dir,
+                    bsddb3.db.DB_CREATE
+                    | bsddb3.db.DB_INIT_LOCK
+                    | bsddb3.db.DB_INIT_LOG
+                    | bsddb3.db.DB_INIT_MPOOL
+                    | bsddb3.db.DB_INIT_TXN
+                    | bsddb3.db.DB_REGISTER)
+        except bsddb3.db.DBRunRecoveryError:
+            raise RuntimeError(
+                    'DB requires recovery! It should have run in .run.main...')
 
         self.db = bsddb3.db.DB(self.db_env)
         self.db.open(

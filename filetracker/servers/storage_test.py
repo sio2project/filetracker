@@ -13,12 +13,14 @@ import unittest
 
 from six import BytesIO
 
+from filetracker.servers.run import db_init
 from filetracker.servers.storage import FileStorage
 
 
 class FileStorageTest(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.mkdtemp()
+        db_init(os.path.join(self.temp_dir, 'db'))
 
     def tearDown(self):
         shutil.rmtree(self.temp_dir)

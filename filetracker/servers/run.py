@@ -13,8 +13,11 @@ import subprocess
 import sys
 import tempfile
 
+import bsddb3
+
 from filetracker.servers.files import FiletrackerServer
 from filetracker.servers.migration import MigrationFiletrackerServer
+from filetracker.utils import mkdir
 
 # Clients may use this as a sensible default port to connect to.
 DEFAULT_PORT = 9999
@@ -92,6 +95,8 @@ def main(args=None):
             accesslog=options.access_log,
         ))
 
+    db_init(os.path.join(options.dir, 'db'))
+
     conf_fd, conf_path = tempfile.mkstemp(text=True)
     try:
         conf_file = os.fdopen(conf_fd, 'w')
@@ -121,6 +126,21 @@ def main(args=None):
         # At this point gunicorn does not need the configuration file, so it
         # can be safely deleted.
         os.unlink(conf_path)
+
+
+def db_init(db_dir):
+    mkdir(db_dir)
+    db_env = bsddb3.db.DBEnv()
+    db_env.open(
+            db_dir,
+            bsddb3.db.DB_CREATE
+            | bsddb3.db.DB_INIT_LOCK
+            | bsddb3.db.DB_INIT_LOG
+            | bsddb3.db.DB_INIT_MPOOL
+            | bsddb3.db.DB_INIT_TXN
+            | bsddb3.db.DB_REGISTER
+            | bsddb3.db.DB_RECOVER)
+    db_env.close()
 
 
 # This filetracker_instance is cached between requests within one WSGI process.
