@@ -30,7 +30,7 @@ class ProtocolTest(unittest.TestCase):
         cls.server_process = Process(
                 target=_start_server, args=(cls.server_dir,))
         cls.server_process.start()
-        time.sleep(1)   # give server some time to start
+        time.sleep(2)   # give server some time to start
 
         # We use a client to set up test environments.
         cls.client = Client(
