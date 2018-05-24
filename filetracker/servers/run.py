@@ -1,6 +1,12 @@
 #!/usr/bin/env python
 
-"""A script for starting filetracker server using gunicorn."""
+"""The entry point for filetracker server.
+
+It uses gunicorn to manage workers, initializes the DB before
+starting handling requests, and exits the whole server on
+worker error. You should consider running this under a supervisor
+process in production.
+"""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -69,12 +75,22 @@ def main(args=None):
         os.makedirs(docroot, 0o700)
 
     gunicorn_settings = strip_margin("""
+        |import sys
+        |
         |bind = ['{listen_on}:{port}']
         |daemon = {daemonize}
         |workers = {workers}
         |worker_class = 'gevent'
         |raw_env = ['FILETRACKER_DIR={filetracker_dir}',
         |           'FILETRACKER_FALLBACK_URL={fallback_url}']
+        |
+        |def worker_int(worker):
+        |   print('Exiting gunicorn: worker received SIGINT')
+        |   sys.exit(1)
+        |
+        |def worker_abort(worker):
+        |   print('Exiting gunicorn: worker received SIGABRT (timeout?)')
+        |   sys.exit(1)
         """.format(
         listen_on=options.listen_on,
         port=options.port,
