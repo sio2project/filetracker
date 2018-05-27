@@ -75,7 +75,8 @@ def main(args=None):
         os.makedirs(docroot, 0o700)
 
     gunicorn_settings = strip_margin("""
-        |import sys
+        |import os
+        |import signal
         |
         |bind = ['{listen_on}:{port}']
         |daemon = {daemonize}
@@ -85,12 +86,12 @@ def main(args=None):
         |           'FILETRACKER_FALLBACK_URL={fallback_url}']
         |
         |def worker_int(worker):
-        |   print('Exiting gunicorn: worker received SIGINT')
-        |   sys.exit(1)
+        |    print('Exiting gunicorn: worker received SIGINT')
+        |    os.kill(os.getppid(), signal.SIGTERM)
         |
         |def worker_abort(worker):
-        |   print('Exiting gunicorn: worker received SIGABRT (timeout?)')
-        |   sys.exit(1)
+        |    print('Exiting gunicorn: worker received SIGABRT (timeout?)')
+        |    os.kill(os.getppid(), signal.SIGTERM)
         """.format(
         listen_on=options.listen_on,
         port=options.port,
