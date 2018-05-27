@@ -49,7 +49,7 @@ class Server(object):
             start_response(e.status, response_headers, sys.exc_info())
             return [traceback.format_exc().encode()]
         except Exception as e:
-            logger.error("Unhandled server exception.", exc_info=1)
+            logger.error('Unhandled server exception.', exc_info=1)
             status = '500 Oops'
             response_headers = [
                 ('Content-Type', 'text/plain'),
