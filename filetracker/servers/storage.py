@@ -30,6 +30,7 @@ import contextlib
 import email.utils
 import errno
 import fcntl
+import gevent
 import gzip
 import logging
 import os
@@ -422,7 +423,18 @@ def _exclusive_lock(path):
     fd = os.open(path, os.O_WRONLY | os.O_CREAT, 0o600)
 
     try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
+        while True:
+            # try to acquire the lock in a loop
+            # because gevent doesn't treat flock as IO,
+            # so waiting here without yielding would get the worker killed
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError as e:
+                if e.errno == errno.EAGAIN:
+                    gevent.sleep(0.002) # yield
+                else:
+                    raise
         yield
     finally:
         fcntl.flock(fd, fcntl.LOCK_UN)
