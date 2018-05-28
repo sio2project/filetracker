@@ -14,10 +14,12 @@ The storage strategy is as follows:
   have their own modification time ("version") different from the
   modification time of the blob.
 
+- Accesses to links and blobs are protected by separate fcntl locks
+  to avoid concurrent modification.
+
 - Additional metadata about blobs is stored in a BSDDB kv-store.
-- The only metadata stored ATM is the symlink count.
-- Accesses to DB are protected by fcntl locks, with one lock
-  for each prefix (256 total).
+- The metadata stored ATM is the symlink count and decompressed
+  ("logical") size.
 """
 
 from __future__ import absolute_import
@@ -29,6 +31,7 @@ import email.utils
 import errno
 import fcntl
 import gzip
+import logging
 import os
 import shutil
 import subprocess
@@ -39,6 +42,9 @@ import bsddb3
 import six
 
 from filetracker.utils import file_digest
+
+
+logger = logging.getLogger(__name__)
 
 
 class FiletrackerFileNotFoundError(Exception):
@@ -119,8 +125,12 @@ class FileStorage(object):
                 has to be set to decompressed file size.
         """
         with _exclusive_lock(self._lock_path('links', name)):
+            logger.debug('Acquired lock to link for %s.', name)
             link_path = self._link_path(name)
             if _path_exists(link_path) and _file_version(link_path) > version:
+                logger.info(
+                    'Tried to store older version of %s (%d < %d), ignoring.',
+                    name, version, _file_version(link_path))
                 return _file_version(link_path)
 
             # data is managed by contents now, and shouldn't be used directly
@@ -130,6 +140,8 @@ class FileStorage(object):
                     if compressed:
                         # This shouldn't occur if the request came from a proper
                         # filetracker client, so we don't care if it's slow.
+                        logger.warning(
+                            'Storing compressed stream without hints.')
                         with gzip.open(
                                 contents.current_path, 'rb') as decompressed:
                             digest = file_digest(decompressed)
@@ -143,9 +155,11 @@ class FileStorage(object):
                 blob_path = self._blob_path(digest)
                 
                 with _exclusive_lock(self._lock_path('blobs', digest)):
+                    logger.debug('Acquired lock for blob %s.', digest)
                     digest_bytes = digest.encode()
 
                     with self._db_transaction() as txn:
+                        logger.debug('Started DB transaction (adding link).')
                         link_count = int(self.db.get(digest_bytes, 0, txn=txn))
                         new_count = str(link_count + 1).encode()
                         self.db.put(digest_bytes, new_count, txn=txn)
@@ -155,9 +169,13 @@ class FileStorage(object):
                                     '{}:logical_size'.format(digest).encode(),
                                     str(logical_size).encode(),
                                     txn=txn)
+                        logger.debug('Commiting DB transaction (adding link).')
+
+                    logger.debug('Committed DB transaction (adding link).')
 
                     # Create a new blob if this isn't a duplicate.
                     if link_count == 0:
+                        logger.debug('Creating new blob.')
                         _create_file_dirs(blob_path)
 
                         if compressed:
@@ -168,10 +186,13 @@ class FileStorage(object):
                                     gzip.open(blob_path, 'wb') as blob:
                                 shutil.copyfileobj(raw, blob)
 
+                logger.debug('Released lock for blob %s.', digest)
+
             if _path_exists(link_path):
                 # Lend the link lock to delete().
                 # Note that DB lock has to be released in advance, otherwise
                 # deadlock is possible in concurrent scenarios.
+                logger.info('Overwriting existing link %s.', name)
                 self.delete(name, version, _lock=False)
 
             _create_file_dirs(link_path)
@@ -179,8 +200,12 @@ class FileStorage(object):
                                             os.path.dirname(link_path))
             os.symlink(rel_blob_path, link_path)
 
+            logger.debug('Created link %s.', name)
+
             lutime(link_path, version)
             return version
+
+        logger.debug('Released lock for link %s.', name)
 
     def delete(self, name, version, _lock=True):
         """Removes a file from the storage.
@@ -202,23 +227,31 @@ class FileStorage(object):
         else:
             file_lock = _no_lock()
         with file_lock:
+            logger.debug('Acquired or inherited lock for link %s.', name)
             if not _path_exists(link_path):
                 raise FiletrackerFileNotFoundError
             if _file_version(link_path) > version:
+                logger.info(
+                    'Tried to delete newer version of %s (%d < %d), ignoring.',
+                    name, version, _file_version(link_path))
                 return False
 
             digest = self._digest_for_link(name)
 
             with _exclusive_lock(self._lock_path('blobs', digest)):
+                logger.debug('Acquired lock for blob %s.', digest)
                 should_delete_blob = False
 
                 with self._db_transaction() as txn:
+                    logger.debug('Started DB transaction (deleting link).')
                     digest_bytes = digest.encode()
                     link_count = self.db.get(digest_bytes, txn=txn)
                     if link_count is None:
                         raise RuntimeError("File exists but has no key in db")
+
                     link_count = int(link_count)
                     if link_count == 1:
+                        logger.debug('Deleting last link to blob %s.', digest)
                         self.db.delete(digest_bytes, txn=txn)
                         self.db.delete(
                                 '{}:logical_size'.format(digest).encode(),
@@ -227,11 +260,18 @@ class FileStorage(object):
                     else:
                         new_count = str(link_count - 1).encode()
                         self.db.put(digest_bytes, new_count, txn=txn)
+                    logger.debug('Committing DB transaction (deleting link).')
+
+                logger.debug('Committed DB transaction (deleting link).')
 
                 os.unlink(link_path)
+                logger.debug('Deleted link %s.', name)
                 if should_delete_blob:
                     os.unlink(self._blob_path(digest))
 
+            logger.debug('Released lock for blob %s.', digest)
+
+        logger.debug('Released (or gave back) lock for link %s.', name)
         return True
 
     def stored_version(self, name):
