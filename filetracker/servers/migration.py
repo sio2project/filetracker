@@ -1,13 +1,15 @@
-#!/usr/bin/env python
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import logging
 import os.path
 
 from filetracker.servers import base
 from filetracker.servers.files import FiletrackerServer
+
+
+logger = logging.getLogger(__name__)
 
 
 class MigrationFiletrackerServer(FiletrackerServer):
@@ -23,8 +25,10 @@ class MigrationFiletrackerServer(FiletrackerServer):
         endpoint, path = base.get_endpoint_and_path(environ)
 
         if os.path.isfile(os.path.join(self.dir, path)):
+            logger.debug('Handling request to %s by ourselves', path)
             return present_handler(environ, start_response)
 
+        logger.debug('Redirecting request to %s to fallback', path)
         new_url = self.redirect_url + '/' + endpoint + '/' + path
         start_response('307 Temporary Redirect', [('Location', new_url)])
         return _EmptyCloseableIterator()
