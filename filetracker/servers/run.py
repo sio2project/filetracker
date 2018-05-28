@@ -132,8 +132,11 @@ def main(args=None):
         os.makedirs(docroot, 0o700)
 
     gunicorn_settings = strip_margin("""
+        |import logging
         |import os
         |import signal
+        |
+        |logger = logging.getLogger('gunicorn.config')
         |
         |bind = ['{listen_on}:{port}']
         |daemon = {daemonize}
@@ -145,7 +148,8 @@ def main(args=None):
         |logconfig_dict = {logconfig_dict}
         |
         |def worker_exit(server, worker):
-        |    print('Exiting gunicorn from worker_exit()')
+        |    logger.info(
+        |        'worker_exit() hook: sending SIGTERM to gunicorn server')
         |    os.kill(os.getppid(), signal.SIGTERM)
         """.format(
         listen_on=options.listen_on,
