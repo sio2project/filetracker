@@ -33,7 +33,8 @@ class Server(object):
                 _body_iter = self.__call__(environ, start_response)
                 # Server implementations should return closeable iterators
                 # from handle_GET to avoid resource leaks.
-                _body_iter.close()
+                if hasattr(_body_iter, 'close'):
+                    _body_iter.close()
 
                 return []
             else:
