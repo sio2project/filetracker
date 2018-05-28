@@ -38,6 +38,8 @@ SERVER_ACCEPTS_GZIP = 2
 # SHA256 headers are used by the server.
 SERVER_ACCEPTS_SHA256_DIGEST = 3
 
+# The server supports deleting files
+SERVER_ACCEPTS_DELETE = 4
 
 _PROTOCOL_CAPABILITIES = {
     1: [
@@ -45,7 +47,8 @@ _PROTOCOL_CAPABILITIES = {
     ],
     2: [
         SERVER_ACCEPTS_GZIP,
-        SERVER_ACCEPTS_SHA256_DIGEST
+        SERVER_ACCEPTS_SHA256_DIGEST,
+        SERVER_ACCEPTS_DELETE,
     ]
 }
 
@@ -196,10 +199,16 @@ class RemoteDataStore(DataStore):
         url, version = self._parse_name(name)
         response = requests.head(url, allow_redirects=True)
         response.raise_for_status()
-        return int(response.headers.get('logical-size', 0))
+
+        if response.headers.get('content-encoding', 'plain') == 'gzip':
+            return int(response.headers.get('logical-size', 0))
+        else:
+            return int(response.headers.get('content-length', 0))
 
     @_verbose_http_errors
     def delete_file(self, filename):
+        if not self._has_capability(SERVER_ACCEPTS_DELETE):
+            return
         url, version = self._parse_name(filename)
         url, headers = self._add_version_to_request(url, {}, version)
         response = requests.delete(url, headers=headers)
