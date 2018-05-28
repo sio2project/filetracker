@@ -431,7 +431,7 @@ def _exclusive_lock(path):
                 fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 break
             except OSError as e:
-                if e.errno == errno.EAGAIN:
+                if e.errno in [errno.EAGAIN, errno.EWOULDBLOCK]:
                     gevent.sleep(0.002) # yield
                 else:
                     raise
