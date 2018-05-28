@@ -31,7 +31,7 @@ setup(
         'console_scripts': [
             'filetracker = filetracker.client.shell:main',
             'filetracker-server = filetracker.servers.run:main',
-            'filetracker-cache-cleaner = filetracker.cachecleaner:main',
+            'filetracker-cache-cleaner = filetracker.scripts.cachecleaner:main',
             'filetracker-migrate = filetracker.scripts.migrate:main',
             'filetracker-recover = filetracker.scripts.recover:main',
         ],
