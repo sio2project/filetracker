@@ -4,11 +4,15 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import socket
 import errno
+import logging
 import os
+import socket
 import sys
 import traceback
+
+
+logger = logging.getLogger(__name__)
 
 
 class HttpError(Exception):
@@ -45,13 +49,12 @@ class Server(object):
             start_response(e.status, response_headers, sys.exc_info())
             return [traceback.format_exc().encode()]
         except Exception as e:
+            logger.error('Unhandled server exception.', exc_info=1)
             status = '500 Oops'
             response_headers = [
                 ('Content-Type', 'text/plain'),
                 ('X-Exception', str(e))
             ]
-            # We have an uncaught exception so it is useful to know its stacktrace.
-            print(traceback.format_exc(), file=sys.stderr)
             start_response(status, response_headers, sys.exc_info())
             return [traceback.format_exc().encode()]
 
@@ -86,18 +89,21 @@ def get_endpoint_and_path(environ):
         return components[0], '/'.join(components[1:])
 
 
+# Deprecated, run.py should be used in all cases.
 def start_cgi(server):
     from flup.server.cgi import WSGIServer
     WSGIServer(server).run()
     sys.exit(0)
 
 
+# Deprecated, run.py should be used in all cases.
 def start_fcgi(server):
     from flup.server.fcgi import WSGIServer
     WSGIServer(server).run()
     sys.exit(0)
 
 
+# Deprecated, run.py should be used in all cases.
 def start_standalone(server, port=8000):
     from wsgiref.simple_server import make_server
     httpd = make_server('', port, server)
