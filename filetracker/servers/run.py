@@ -144,12 +144,8 @@ def main(args=None):
         |
         |logconfig_dict = {logconfig_dict}
         |
-        |def worker_int(worker):
-        |    print('Exiting gunicorn: worker received SIGINT')
-        |    os.kill(os.getppid(), signal.SIGTERM)
-        |
-        |def worker_abort(worker):
-        |    print('Exiting gunicorn: worker received SIGABRT (timeout?)')
+        |def worker_exit(server, worker):
+        |    print('Exiting gunicorn from worker_exit()')
         |    os.kill(os.getppid(), signal.SIGTERM)
         """.format(
         listen_on=options.listen_on,
