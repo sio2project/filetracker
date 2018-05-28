@@ -217,12 +217,7 @@ def db_init(db_dir):
 filetracker_instance = None
 
 
-def kill_gunicorn_server():
-    os.kill(os.getppid(), signal.SIGTERM)
-
-
 def gunicorn_entry(env, start_response):
-    signal.signal(signal.SIGTERM, kill_gunicorn_server)
     global filetracker_instance
     if filetracker_instance is None:
         filetracker_instance = FiletrackerServer()
@@ -230,7 +225,6 @@ def gunicorn_entry(env, start_response):
 
 
 def gunicorn_entry_migration(env, start_response):
-    signal.signal(signal.SIGTERM, kill_gunicorn_server)
     global filetracker_instance
     if filetracker_instance is None:
         fallback = os.environ.get('FILETRACKER_FALLBACK_URL', None)
