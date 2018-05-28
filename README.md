@@ -33,6 +33,17 @@ and `filetracker`. A simple filetracker server can be started with
  Read the scripts' help pages for more detailed information
 on running them.
 
+## Scripts
+
+There are some useful scripts for working with filetracker in
+`filetracker.scripts` package, namely:
+
+- `filetracker-migrate` for uploading directories recursively to the server
+- `filetracker-recover` for recovering storage metadata after serious failures
+- `filetracker-cache-cleaner` for cleaning client cache
+
+Check out the source or run them with `-h` for detailed information.
+
 ## Upgrading from older versions
 
 - [1.x to 2.x](MIGRATING.md)
