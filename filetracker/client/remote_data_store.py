@@ -112,14 +112,11 @@ class RemoteDataStore(DataStore):
     def add_file(self, name, filename, compress_hint=True):
         url, version = self._parse_name(name)
 
-        if self._has_capability(SERVER_ACCEPTS_SHA256_DIGEST):
-            sha = file_digest(filename)
-        else:
-            sha = ''
+        headers = {}
 
-        headers = {
-            'SHA256-Checksum': sha
-        }
+        if (compress_hint
+                and self._has_capability(SERVER_ACCEPTS_SHA256_DIGEST)):
+            headers['SHA256-Checksum'] = file_digest(filename)
 
         # Important detail: this upload is streaming.
         # http://docs.python-requests.org/en/latest/user/advanced/#streaming-uploads
