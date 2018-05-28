@@ -1,12 +1,11 @@
-#!/usr/bin/env python
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 import email.utils
 import json
-import os.path
+import logging
+import os
 import time
 
 from six.moves.urllib.parse import parse_qs
@@ -14,6 +13,9 @@ from six.moves.urllib.parse import parse_qs
 from filetracker.servers import base
 from filetracker.servers.storage import (FileStorage,
                                          FiletrackerFileNotFoundError)
+
+
+logger = logging.getLogger(__name__)
 
 
 class FiletrackerServer(base.Server):
@@ -54,6 +56,13 @@ class FiletrackerServer(base.Server):
 
         digest = environ.get('HTTP_SHA256_CHECKSUM', None)
         logical_size = environ.get('HTTP_LOGICAL_SIZE', None)
+
+        if compressed and digest and logical_size:
+            logger.debug('Handling PUT %s.', path)
+        else:
+            logger.info('Handling PUT %s with unusual headers: '
+                    'compressed=%s, digest=%s, logical_size=%s',
+                    path, compressed, digest, logical_size)
 
         version = self.storage.store(name=path,
                                      data=environ['wsgi.input'],
@@ -116,6 +125,8 @@ class FiletrackerServer(base.Server):
             raise base.HttpError('400 Bad Request',
                                  '"?last-modified=" is required')
 
+        logger.debug('Handling DELETE %s@%d', path, last_modified)
+
         try:
             self.storage.delete(name=path,
                                 version=last_modified)
@@ -132,6 +143,8 @@ class FiletrackerServer(base.Server):
         last_modified = query_params.get('last_modified', (None,))[0]
         if not last_modified:
             last_modified = int(time.time())
+
+        logger.debug('Handling GET /list/%s (@%d)', path, last_modified)
 
         root_dir = os.path.join(self.dir, path)
         if not os.path.isdir(root_dir):
