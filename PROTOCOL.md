@@ -1,10 +1,20 @@
 # Filetracker server API
 
-Filetracker server (starting from version 2.0) provides a simple HTTP API for
+Filetracker server (starting from version 2.1) provides a simple HTTP API for
 clients. Filetracker client is the primary consumer of this API, but its simplicity
 allows to interact with the server using plain `curl` or Python `requests`.
 
-## API reference
+## API reference (version 2)
+
+### `GET /version`
+
+Responds with the following JSON:
+
+```json
+{
+  "protocol_versions": [2]
+}
+```
 
 ### `GET /files/{path}`
 
