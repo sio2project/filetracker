@@ -54,7 +54,7 @@ _DEFAULT_LOG_CONFIG = {
   },
   'formatters': {
     'precise': {
-      'format': '%(asctime)s %(levelname)-8s %(name)-15s %(message)s',
+      'format': '%(asctime)s %(levelname)-8s (%(process)-5d) %(name)-15s %(message)s',
       'datefmt': '%Y-%m-%d %H:%M:%S'
     }
   },
@@ -120,11 +120,9 @@ def main(args=None):
         log_config = _DEFAULT_LOG_CONFIG
         if options.log:
             log_config['handlers']['default'] = {
-                'class': 'logging.handlers.RotatingFileHandler',
+                'class': 'logging.FileHandler',
                 'formatter': 'precise',
                 'filename': options.log,
-                'maxBytes': 1024 * 1024,
-                'backupCount': 3
             }
 
     logging.config.dictConfig(log_config)
