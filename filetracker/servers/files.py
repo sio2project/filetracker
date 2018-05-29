@@ -19,8 +19,12 @@ logger = logging.getLogger(__name__)
 
 
 class FiletrackerServer(base.Server):
-    """A WSGI application providing a HTTP server compatible with
-       :class:`filetracker.RemoteDataStore`."""
+    """A WSGI application providing a filetracker server.
+
+    Note that this wouldn't work as standalone server: a "manager"
+    process should handle DB initialization and recovery, refer
+    to ``filetracker.servers.run`` for more details.
+    """
 
     def __init__(self, dir=None):
         if dir is None:
