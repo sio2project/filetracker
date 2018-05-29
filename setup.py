@@ -13,7 +13,8 @@ setup(
     install_requires = [
         'bsddb3',
         'flup6',
-        'gunicorn[gevent]',
+        'gunicorn',
+        'gevent',
         'progressbar2',
         'requests',
         'six',
