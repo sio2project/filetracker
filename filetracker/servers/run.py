@@ -6,6 +6,11 @@ It uses gunicorn to manage workers, initializes the DB before
 starting handling requests, and exits the whole server on
 worker error. You should consider running this under a supervisor
 process in production.
+
+Important note: worker exit killing the whole server is necessary
+to ensure integrity of Berkeley DB database, which is shared
+between all worker processes. Refer to
+https://web.stanford.edu/class/cs276a/projects/docs/berkeleydb/ref/transapp/app.html.
 """
 
 from __future__ import absolute_import
@@ -148,6 +153,7 @@ def main(args=None):
         |logconfig_dict = {logconfig_dict}
         |
         |def worker_exit(server, worker):
+        |    # See module docstring for why this is required.
         |    logger.info(
         |        'worker_exit() hook: sending SIGTERM to gunicorn server')
         |    os.kill(os.getppid(), signal.SIGTERM)
