@@ -1,6 +1,17 @@
 #!/usr/bin/env python
 
-"""A script for starting filetracker server using gunicorn."""
+"""The entry point for filetracker server.
+
+It uses gunicorn to manage workers, initializes the DB before
+starting handling requests, and exits the whole server on
+worker error. You should consider running this under a supervisor
+process in production.
+
+Important note: worker exit killing the whole server is necessary
+to ensure integrity of Berkeley DB database, which is shared
+between all worker processes. Refer to
+https://web.stanford.edu/class/cs276a/projects/docs/berkeleydb/ref/transapp/app.html.
+"""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -126,6 +137,12 @@ def main(args=None):
         os.makedirs(docroot, 0o700)
 
     gunicorn_settings = strip_margin("""
+        |import logging
+        |import os
+        |import signal
+        |
+        |logger = logging.getLogger('gunicorn.config')
+        |
         |bind = ['{listen_on}:{port}']
         |daemon = {daemonize}
         |workers = {workers}
@@ -134,6 +151,12 @@ def main(args=None):
         |           'FILETRACKER_FALLBACK_URL={fallback_url}']
         |
         |logconfig_dict = {logconfig_dict}
+        |
+        |def worker_exit(server, worker):
+        |    # See module docstring for why this is required.
+        |    logger.info(
+        |        'worker_exit() hook: sending SIGTERM to gunicorn server')
+        |    os.kill(os.getppid(), signal.SIGTERM)
         """.format(
         listen_on=options.listen_on,
         port=options.port,
