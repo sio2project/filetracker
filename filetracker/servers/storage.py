@@ -30,6 +30,7 @@ import contextlib
 import email.utils
 import errno
 import fcntl
+import gevent
 import gzip
 import logging
 import os
@@ -44,11 +45,22 @@ import six
 from filetracker.utils import file_digest
 
 
+_LOCK_RETRIES = 20
+_LOCK_SLEEP_TIME_S = 1
+
+
 logger = logging.getLogger(__name__)
 
 
 class FiletrackerFileNotFoundError(Exception):
     pass
+
+
+class ConcurrentModificationError(Exception):
+    """Raised after acquiring lock failed multiple times."""
+    def __init__(self, lock_name):
+        message = 'Failed to acquire lock: {}'.format(lock_name)
+        super(ConcurrentModificationError, self).__init__(self, message)
 
 
 class FileStorage(object):
@@ -422,10 +434,32 @@ def _exclusive_lock(path):
     fd = os.open(path, os.O_WRONLY | os.O_CREAT, 0o600)
 
     try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
-        yield
+        retries_left = _LOCK_RETRIES
+        success = False
+
+        while retries_left > 0:
+            # try to acquire the lock in a loop
+            # because gevent doesn't treat flock as IO,
+            # so waiting here without yielding would get the worker killed
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                success = True
+                break
+            except IOError as e:
+                if e.errno in [errno.EAGAIN, errno.EWOULDBLOCK]:
+                    # This yields execution to other green threads.
+                    gevent.sleep(_LOCK_SLEEP_TIME_S)
+                    retries_left -= 1
+                else:
+                    raise
+
+        if success:
+            yield
+        else:
+            raise ConcurrentModificationError(path)
     finally:
-        fcntl.flock(fd, fcntl.LOCK_UN)
+        if success:
+            fcntl.flock(fd, fcntl.LOCK_UN)
         os.close(fd)
 
 

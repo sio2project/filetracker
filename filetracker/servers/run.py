@@ -149,6 +149,7 @@ def main(args=None):
         |worker_class = 'gevent'
         |raw_env = ['FILETRACKER_DIR={filetracker_dir}',
         |           'FILETRACKER_FALLBACK_URL={fallback_url}']
+        |timeout = 5*60
         |
         |logconfig_dict = {logconfig_dict}
         |
