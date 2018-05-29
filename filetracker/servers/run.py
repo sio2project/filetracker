@@ -6,6 +6,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import json
+import logging
+import logging.config
 import multiprocessing
 import os
 from optparse import OptionParser
@@ -21,8 +24,46 @@ from filetracker.servers.files import FiletrackerServer
 from filetracker.servers.migration import MigrationFiletrackerServer
 from filetracker.utils import mkdir
 
+
+logger = logging.getLogger(__name__)
+
+
 # Clients may use this as a sensible default port to connect to.
 DEFAULT_PORT = 9999
+
+_DEFAULT_LOG_CONFIG = {
+  'version': 1,
+  'handlers': {
+    'default': {
+      'class': 'logging.StreamHandler',
+      'formatter': 'precise',
+      'level': 'INFO',
+      'stream': 'ext://sys.stdout'
+    }
+  },
+  'formatters': {
+    'precise': {
+      'format': '%(asctime)s %(levelname)-8s %(name)-15s %(message)s',
+      'datefmt': '%Y-%m-%d %H:%M:%S'
+    }
+  },
+  'loggers': {
+    'gunicorn.error': {
+      'handlers': ['default'],
+      'level': 'INFO',
+      'propagate': False
+    },
+    'gunicorn.access': {
+      'handlers': ['default'],
+      'level': 'INFO',
+      'propagate': False
+    },
+    '': {
+      'handlers': ['default'],
+      'level': 'INFO'
+    }
+  }
+}
 
 
 def strip_margin(text):
@@ -41,9 +82,9 @@ def main(args=None):
             help="Specify Filetracker dir (taken from FILETRACKER_DIR "
                  "environment variable if not present)")
     parser.add_option('-L', '--log', dest='log', default=None,
-            help="Error log file location (no log by default)")
-    parser.add_option('--access-log', dest='access_log', default=None,
-                      help="Access log file location (no log by default)")
+            help="Log file location (stderr by default)")
+    parser.add_option('--log-config', dest='log_config', default=None,
+            help="Logging configuration (in JSON). Takes precedence over -L")
     parser.add_option('-D', '--no-daemon', dest='daemonize',
             action='store_false', default=True,
             help="Do not daemonize, stay in foreground")
@@ -61,6 +102,22 @@ def main(args=None):
     if not options.dir:
         options.dir = os.environ['FILETRACKER_DIR']
 
+    if options.log_config:
+        with open(options.log_config) as f:
+            log_config = json.load(f)
+    else:
+        log_config = _DEFAULT_LOG_CONFIG
+        if options.log:
+            log_config['handlers']['default'] = {
+                'class': 'logging.handlers.RotatingFileHandler',
+                'formatter': 'precise',
+                'filename': options.log,
+                'maxBytes': 1024 * 1024,
+                'backupCount': 3
+            }
+
+    logging.config.dictConfig(log_config)
+
     filetracker_dir = os.path.abspath(options.dir)
     if not os.path.exists(filetracker_dir):
         os.makedirs(filetracker_dir, 0o700)
@@ -75,28 +132,17 @@ def main(args=None):
         |worker_class = 'gevent'
         |raw_env = ['FILETRACKER_DIR={filetracker_dir}',
         |           'FILETRACKER_FALLBACK_URL={fallback_url}']
+        |
+        |logconfig_dict = {logconfig_dict}
         """.format(
         listen_on=options.listen_on,
         port=options.port,
         daemonize=options.daemonize,
         workers=options.workers,
         filetracker_dir=options.dir,
-        fallback_url=options.fallback_url
+        fallback_url=options.fallback_url,
+        logconfig_dict=repr(log_config),
     ))
-
-    if options.log:
-        gunicorn_settings += strip_margin("""
-        |errorlog = '{errorlog}'
-        |capture_output = True
-        """.format(
-            errorlog=options.log,
-        ))
-    if options.access_log:
-        gunicorn_settings += strip_margin("""
-        |accesslog = '{accesslog}'
-        """.format(
-            accesslog=options.access_log,
-        ))
 
     db_init(os.path.join(options.dir, 'db'))
 
@@ -115,7 +161,7 @@ def main(args=None):
         try:
             popen = subprocess.Popen(args)
         except OSError as e:
-            raise RuntimeError("Cannot run gunicorn:\n%s" % e)
+            raise RuntimeError('Cannot run gunicorn:\n%s' % e)
 
         signal.signal(signal.SIGINT, lambda signum, frame: popen.terminate())
         signal.signal(signal.SIGTERM, lambda signum, frame: popen.terminate())
@@ -124,7 +170,7 @@ def main(args=None):
         if not options.daemonize:
             sys.exit(retval)
         if retval:
-            raise RuntimeError("gunicorn exited with code %d" % retval)
+            raise RuntimeError('gunicorn exited with code %d' % retval)
     finally:
         # At this point gunicorn does not need the configuration file, so it
         # can be safely deleted.
@@ -132,7 +178,7 @@ def main(args=None):
 
 
 def db_init(db_dir):
-    print('Attempting to create and init database', file=sys.stderr)
+    logger.info('Attempting to create and/or initialize database.')
     mkdir(db_dir)
     db_env = bsddb3.db.DBEnv()
     db_env.open(
@@ -145,7 +191,7 @@ def db_init(db_dir):
             | bsddb3.db.DB_REGISTER
             | bsddb3.db.DB_RECOVER)
     db_env.close()
-    print('Successfully created and initted database', file=sys.stderr)
+    logger.info('Successfully created and/or initialized database.')
 
 
 # This filetracker_instance is cached between requests within one WSGI process.
@@ -166,7 +212,7 @@ def gunicorn_entry_migration(env, start_response):
     if filetracker_instance is None:
         fallback = os.environ.get('FILETRACKER_FALLBACK_URL', None)
         if not fallback:
-            raise RuntimeError("Configuration error. Fallback url not set.")
+            raise RuntimeError('Configuration error. Fallback url not set.')
         filetracker_instance = MigrationFiletrackerServer(
             redirect_url=fallback
         )
