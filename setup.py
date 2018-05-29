@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 setup(
     name = 'filetracker',
-    version = '2.0',
+    version = '2.1rc1',
     author = 'SIO2 Project Team',
     author_email = 'sio2@sio2project.mimuw.edu.pl',
     description = 'Filetracker caching file storage',
@@ -13,7 +13,8 @@ setup(
     install_requires = [
         'bsddb3',
         'flup6',
-        'gunicorn[gevent]',
+        'gunicorn',
+        'gevent',
         'progressbar2',
         'requests',
         'six',
