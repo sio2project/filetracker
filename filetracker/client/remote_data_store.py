@@ -197,6 +197,8 @@ class RemoteDataStore(DataStore):
         response = requests.head(url, allow_redirects=True)
         response.raise_for_status()
 
+        # Logical-Size is only sent by new servers that use
+        # compression and send 'Content-Encoding: gzip'
         if response.headers.get('content-encoding', 'plain') == 'gzip':
             return int(response.headers.get('logical-size', 0))
         else:
