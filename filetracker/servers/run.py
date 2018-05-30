@@ -42,40 +42,41 @@ logger = logging.getLogger(__name__)
 # Clients may use this as a sensible default port to connect to.
 DEFAULT_PORT = 9999
 
-_DEFAULT_LOG_CONFIG = {
-  'version': 1,
-  'handlers': {
-    'default': {
-      'class': 'logging.StreamHandler',
-      'formatter': 'precise',
-      'level': 'INFO',
-      'stream': 'ext://sys.stdout'
+_DEFAULT_LOG_CONFIG_JSON = """
+{
+  "version": 1,
+  "handlers": {
+    "default": {
+      "class": "logging.StreamHandler",
+      "formatter": "precise",
+      "level": "INFO",
+      "stream": "ext://sys.stdout"
     }
   },
-  'formatters': {
-    'precise': {
-      'format': '%(asctime)s %(levelname)-8s %(name)-15s %(message)s',
-      'datefmt': '%Y-%m-%d %H:%M:%S'
+  "formatters": {
+    "precise": {
+      "format": "%(asctime)s %(levelname)-8s (%(process)-5d) %(name)-15s %(message)s",
+      "datefmt": "%Y-%m-%d %H:%M:%S"
     }
   },
-  'loggers': {
-    'gunicorn.error': {
-      'handlers': ['default'],
-      'level': 'INFO',
-      'propagate': False
+  "loggers": {
+    "gunicorn.error": {
+      "handlers": ["default"],
+      "level": "INFO",
+      "propagate": false
     },
-    'gunicorn.access': {
-      'handlers': ['default'],
-      'level': 'INFO',
-      'propagate': False
+    "gunicorn.access": {
+      "handlers": ["default"],
+      "level": "INFO",
+      "propagate": false
     },
-    '': {
-      'handlers': ['default'],
-      'level': 'INFO'
+    "": {
+      "handlers": ["default"],
+      "level": "INFO"
     }
   }
 }
-
+"""
 
 def strip_margin(text):
     return re.sub('\n[ \t]*\|', '\n', text)
@@ -93,9 +94,12 @@ def main(args=None):
             help="Specify Filetracker dir (taken from FILETRACKER_DIR "
                  "environment variable if not present)")
     parser.add_option('-L', '--log', dest='log', default=None,
-            help="Log file location (stderr by default)")
+            help="Log file location (default: stdout)")
+    parser.add_option('--log-level', dest='log_level', default='INFO',
+            help="Log level (default: INFO)")
     parser.add_option('--log-config', dest='log_config', default=None,
-            help="Logging configuration (in JSON). Takes precedence over -L")
+            help="Logging configuration (in JSON). "
+                 "Takes precedence over other logging flags")
     parser.add_option('-D', '--no-daemon', dest='daemonize',
             action='store_false', default=True,
             help="Do not daemonize, stay in foreground")
@@ -117,15 +121,19 @@ def main(args=None):
         with open(options.log_config) as f:
             log_config = json.load(f)
     else:
-        log_config = _DEFAULT_LOG_CONFIG
+        log_config = json.loads(_DEFAULT_LOG_CONFIG_JSON)
         if options.log:
             log_config['handlers']['default'] = {
-                'class': 'logging.handlers.RotatingFileHandler',
+                'class': 'logging.FileHandler',
                 'formatter': 'precise',
                 'filename': options.log,
-                'maxBytes': 1024 * 1024,
-                'backupCount': 3
+                'level': 'INFO',
             }
+        if options.log_level:
+            log_config['handlers']['default']['level'] = options.log_level
+            log_config['loggers']['gunicorn.error']['level'] = options.log_level
+            log_config['loggers']['gunicorn.access']['level'] = options.log_level
+            log_config['loggers']['']['level'] = options.log_level
 
     logging.config.dictConfig(log_config)
 
