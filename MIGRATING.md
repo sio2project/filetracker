@@ -18,12 +18,12 @@ should see all of your files under `ft_root/files`.
 New filetracker server depends on Berkeley DB, so you should have it installed
 (on Ubuntu or Debian install `libdb-dev`, on Arch it's `db`). 
 
-Activate your venv, and upgrade the `filetracker` package to version 2.0 (or newer).
+Activate your venv, and upgrade the `filetracker` package to version 2.1 (or newer).
 Now your `$PATH` should contain `filetracker-migrate` script
 (try running `$ filetracker-migrate -h`).
 
 Now, run the filetracker server in the usual directory with
-`filetracker-server -L /dev/null -d ft_root -p 9998 -D`, port number
+`filetracker-server -L ~/filetracker-migration.log -d ft_root -p 9998 -D`, port number
 is arbitrary, `ft_root` should be substituted for your actual path). OIOIOI and other
 SIO2 services shouldn't be running, otherwise you will get lots of SE verdicts
 and HTTP 500 errors.
