@@ -24,7 +24,7 @@ class MigrationFiletrackerServer(FiletrackerServer):
     def handle_redirect(self, environ, start_response, present_handler):
         endpoint, path = base.get_endpoint_and_path(environ)
 
-        if os.path.isfile(os.path.join(self.dir, path)):
+        if endpoint != 'files' or os.path.isfile(os.path.join(self.dir, path)):
             logger.debug('Handling request to %s by ourselves', path)
             return present_handler(environ, start_response)
 
