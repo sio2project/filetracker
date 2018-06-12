@@ -4,6 +4,9 @@ The storage format of the filetracker server is very different in the new server
 so non-trivial migration is required if you want to preserve your users' files
 (submitted sources, problem packages, etc.).
 
+After migration is complete, you may expect total filetracker storage size to decrease
+by ~70% for a typical OIOIOI instance.
+
 There are two migration options, but for both of them, you first need to make sure OIOIOI
 uses `remote_storage_factory` as `FILETRACKER_CLIENT_FACTORY` and `FILETRACKER_CACHE_ROOT` is configured in your `settings.py`. If you have a recent
 config version (23+), this is the default behaviour.
@@ -33,6 +36,8 @@ Navigate to `ft_root` and execute the following command:
 
 CAUTION: if you have a lot of files (>100 GiB), this command may take
 a few days to complete, so doing this in a usual SSH session may not be the best idea.
+Consider using `tmux` or `screen`. Average migration speed for our servers was
+10 GiB/h.
 
 After the command above is completed you can safely remove the original `./files`
 directory (it's not used by the new server). Your previous server config should still work,
