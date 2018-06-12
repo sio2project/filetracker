@@ -67,10 +67,10 @@ def get_endpoint_and_path(environ):
     of them are without leading slashes.
     """
     path = environ['PATH_INFO']
-    if '..' in path:
-        raise HttpError('400 Bad Request', 'Path cannot contain "..".')
-
     components = path.split('/')
+
+    if '..' in components:
+        raise HttpError('400 Bad Request', 'Path cannot contain "..".')
 
     # Strip closing slash
     if components and components[-1] == '':
