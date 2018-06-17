@@ -28,7 +28,7 @@ different major filetracker versions.
 """
 
 
-def main():
+def main(args=None):
     parser = argparse.ArgumentParser(description=_DESCRIPTION)
     parser.add_argument('files', help='file tree to be uploaded')
     parser.add_argument('url', help='URL of the filetracker server')
@@ -37,7 +37,7 @@ def main():
     parser.add_argument('-s', '--silent', action='store_true',
             help='if set, progress bar is not printed')
 
-    args = parser.parse_args()
+    args = parser.parse_args(args)
 
     upload_root = args.files
     url = args.url
