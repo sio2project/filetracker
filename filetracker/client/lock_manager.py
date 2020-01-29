@@ -27,8 +27,11 @@ class LockManager(object):
             """Unlocks the file (no-op if file is not locked)"""
             raise NotImplementedError
 
-        def close(self):
+        def close(self, delete=False):
             """Unlocks the file and releases any system resources.
+
+               If ``delete`` is ``True``, also removes the underlying
+               lock file or equivalent.
 
                May be called more than once (it's a no-op then).
             """
@@ -48,7 +51,9 @@ class FcntlLockManager(LockManager):
     """A :class:`LockManager` using ``fcntl.flock``."""
 
     class FcntlLock(LockManager.Lock):
-        def __init__(self, filename):
+        def __init__(self, manager, filename):
+            self.manager = manager
+            self.filename = filename
             self.fd = os.open(filename, os.O_WRONLY | os.O_CREAT, 0o600)
 
             # Set mtime so that any future cleanup script may remove lock files
@@ -64,8 +69,13 @@ class FcntlLockManager(LockManager):
         def unlock(self):
             fcntl.flock(self.fd, fcntl.LOCK_UN)
 
-        def close(self):
+        def close(self, delete=False):
             if self.fd != -1:
+                if delete:
+                    os.remove(self.filename)
+                    dir_path = os.path.dirname(self.filename)
+                    if dir_path != self.manager.dir:
+                        os.removedirs(dir_path)
                 os.close(self.fd)
                 self.fd = -1
 
