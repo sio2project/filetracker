@@ -3,7 +3,7 @@
 import fcntl
 import os
 
-from filetracker.utils import split_name, check_name, mkdir
+from filetracker.utils import split_name, check_name, mkdir, rmdirs
 
 
 class LockManager(object):
@@ -27,8 +27,11 @@ class LockManager(object):
             """Unlocks the file (no-op if file is not locked)"""
             raise NotImplementedError
 
-        def close(self):
+        def close(self, delete=False):
             """Unlocks the file and releases any system resources.
+
+               If ``delete`` is ``True``, also removes the underlying
+               lock file or equivalent.
 
                May be called more than once (it's a no-op then).
             """
@@ -48,8 +51,17 @@ class FcntlLockManager(LockManager):
     """A :class:`LockManager` using ``fcntl.flock``."""
 
     class FcntlLock(LockManager.Lock):
-        def __init__(self, filename):
-            self.fd = os.open(filename, os.O_WRONLY | os.O_CREAT, 0o600)
+        def __init__(self, manager, filename):
+            self.manager = manager
+            self.filename = filename
+
+            dir = os.path.dirname(filename)
+            fcntl.flock(manager.tree_lock_fd, fcntl.LOCK_EX)
+            try:
+                mkdir(dir)
+                self.fd = os.open(filename, os.O_WRONLY | os.O_CREAT, 0o600)
+            finally:
+                fcntl.flock(manager.tree_lock_fd, fcntl.LOCK_UN)
 
             # Set mtime so that any future cleanup script may remove lock files
             # not used for some specified time.
@@ -64,8 +76,18 @@ class FcntlLockManager(LockManager):
         def unlock(self):
             fcntl.flock(self.fd, fcntl.LOCK_UN)
 
-        def close(self):
+        def close(self, delete=False):
             if self.fd != -1:
+                if delete:
+                    fcntl.flock(self.manager.tree_lock_fd, fcntl.LOCK_EX)
+                    try:
+                        os.remove(self.filename)
+                        dir_path = os.path.dirname(self.filename)
+                        rmdirs(dir_path, self.manager.dir)
+                    except OSError:
+                        pass
+                    finally:
+                        fcntl.flock(self.manager.tree_lock_fd, fcntl.LOCK_UN)
                 os.close(self.fd)
                 self.fd = -1
 
@@ -78,13 +100,18 @@ class FcntlLockManager(LockManager):
         self.dir = dir
         mkdir(dir)
 
+        # All mkdirs, opens, rmdirs and unlinks must be guarded by this lock
+        self.tree_lock_fd = os.open(os.path.join(dir, 'tree.lock'),
+                os.O_WRONLY | os.O_CREAT, 0o600)
+
+    def __del__(self):
+        os.close(self.tree_lock_fd)
+
     def lock_for(self, name):
         check_name(name)
         name, version = split_name(name)
         path = self.dir + name
-        dir = os.path.dirname(path)
-        mkdir(dir)
-        return self.FcntlLock(path)
+        return self.FcntlLock(self, path)
 
 
 class NoOpLockManager(LockManager):

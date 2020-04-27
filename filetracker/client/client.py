@@ -299,10 +299,12 @@ class Client(object):
         if self.local_store:
             lock = self.lock_manager.lock_for(name)
             lock.lock_exclusive()
+            delete = False
             try:
                 self.local_store.delete_file(name)
+                delete = True
             finally:
-                lock.close()
+                lock.close(delete)
         if self.remote_store:
             self.remote_store.delete_file(name)
 
