@@ -62,6 +62,18 @@ def mkdir(name):
             raise
 
 
+def rmdirs(name, root):
+    """Removes empty directories from ``name`` upwards, stops at ``root``."""
+    while name != root:
+        try:
+            os.rmdir(name)
+        except OSError as e:
+            if e.errno in (errno.ENOTEMPTY, errno.ENOENT):
+                return
+            else:
+                raise
+
+
 _BUFFER_SIZE = 64 * 1024
 
 

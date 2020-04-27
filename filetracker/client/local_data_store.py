@@ -5,7 +5,8 @@ import shutil
 
 from filetracker.client import FiletrackerError
 from filetracker.client.data_store import DataStore
-from filetracker.utils import split_name, versioned_name, check_name, mkdir
+from filetracker.utils import split_name, versioned_name, check_name, mkdir, \
+        rmdirs
 
 
 class LocalDataStore(DataStore):
@@ -68,10 +69,8 @@ class LocalDataStore(DataStore):
             if version is not None and _file_version(path) != version:
                 return
             os.remove(path)
-
             dir_path = os.path.dirname(path)
-            if dir_path != self.dir:
-                os.removedirs(dir_path)
+            rmdirs(dir_path, self.dir)
         except OSError:
             pass
 
