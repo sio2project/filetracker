@@ -94,7 +94,7 @@ class FcntlLockManager(LockManager):
         path = self.dir + name
         dir = os.path.dirname(path)
         mkdir(dir)
-        return self.FcntlLock(path)
+        return self.FcntlLock(self, path)
 
 
 class NoOpLockManager(LockManager):
