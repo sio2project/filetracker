@@ -112,7 +112,6 @@ class Client(object):
         uname, version = split_name(name)
 
         lock = None
-        delete_lock = False
         if self.local_store:
             lock = self.lock_manager.lock_for(uname)
             if _lock_exclusive:
@@ -147,12 +146,9 @@ class Client(object):
                     self._add_to_cache(vname, save_to)
                 return vname
             raise FiletrackerError("File not available: %s" % name)
-        except FiletrackerError:
-            delete_lock = True
-            raise
         finally:
             if lock:
-                lock.close(delete_lock)
+                lock.close()
             logger.debug('    processed %s in %.2fs', name, time.time() - t)
 
     def get_stream(self, name, force_refresh=False, serve_from_cache=False):
@@ -170,7 +166,6 @@ class Client(object):
         uname, version = split_name(name)
 
         lock = None
-        delete_lock = False
         if self.local_store:
             lock = self.lock_manager.lock_for(uname)
             lock.lock_shared()
@@ -199,12 +194,9 @@ class Client(object):
                     return self.local_store.get_stream(name)
                 return self.remote_store.get_stream(name)
             raise FiletrackerError("File not available: %s" % name)
-        except FiletrackerError:
-            delete_lock = True
-            raise
         finally:
             if lock:
-                lock.close(delete_lock)
+                lock.close()
 
     def file_version(self, name):
         """Returns the newest available version number of the file.

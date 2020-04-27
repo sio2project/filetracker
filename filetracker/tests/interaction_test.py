@@ -189,14 +189,14 @@ class InteractionTest(unittest.TestCase):
         self.client.put_file('/dir/del.txt', src_file)
         self.client.delete_file('/dir/del.txt')
 
-        with self.assertRaisesRegexp(FiletrackerError, "404"):
-            self.client.get_stream('/dir/del.txt')
-
         for d in (self.cache_dir, self.server_dir):
             for f in ('files', 'locks'):
                 self.assertFalse(os.path.exists(os.path.join(d, f, 'dir')),
                         "{}/{}/dir not deleted ({})".format(d, f,
                             d == self.cache_dir and "cache" or "server"))
+
+        with self.assertRaisesRegexp(FiletrackerError, "404"):
+            self.client.get_stream('/dir/del.txt')
 
 
 def _start_server(server_dir):
