@@ -275,7 +275,6 @@ class Client(object):
         check_name(name)
 
         lock = None
-        delete_lock = True
         if self.local_store:
             lock = self.lock_manager.lock_for(name)
             lock.lock_exclusive()
@@ -286,10 +285,9 @@ class Client(object):
             if (to_remote_store or not self.local_store) and self.remote_store:
                 versioned_name = self.remote_store.add_file(
                         name, filename, compress_hint=compress_hint)
-            delete_lock = False
         finally:
             if lock:
-                lock.close(delete_lock)
+                lock.close()
 
         return versioned_name
 
