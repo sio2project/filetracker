@@ -68,7 +68,7 @@ class InteractionTest(unittest.TestCase):
 
     def test_get_file_should_raise_error_if_file_doesnt_exist(self):
         temp_file = os.path.join(self.temp_dir, 'get_doesnt_exist.txt')
-        
+
         with self.assertRaises(FiletrackerError):
             self.client.get_file('/doesnt_exist', temp_file)
 
@@ -180,17 +180,23 @@ class InteractionTest(unittest.TestCase):
         with self.assertRaisesRegexp(FiletrackerError, "404"):
             self.client.delete_file('/nonexistent.txt')
 
-    def test_delete_should_remove_file(self):
+    def test_delete_should_remove_file_and_dir(self):
         src_file = os.path.join(self.temp_dir, 'del.txt')
 
         with open(src_file, 'wb') as sf:
             sf.write(b'test')
 
-        self.client.put_file('/del.txt', src_file)
-        self.client.delete_file('/del.txt')
+        self.client.put_file('/dir/del.txt', src_file)
+        self.client.delete_file('/dir/del.txt')
 
         with self.assertRaisesRegexp(FiletrackerError, "404"):
-            self.client.get_stream('/del.txt')
+            self.client.get_stream('/dir/del.txt')
+
+        for d in (self.cache_dir, self.server_dir):
+            for f in ('files', 'locks'):
+                self.assertFalse(os.path.exists(os.path.join(d, f, 'dir')),
+                        "{}/{}/dir not deleted ({})".format(d, f,
+                            d == self.cache_dir and "cache" or "server"))
 
 
 def _start_server(server_dir):

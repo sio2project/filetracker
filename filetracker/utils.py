@@ -3,6 +3,7 @@
 import errno
 import hashlib
 import os
+import os.path
 import shutil
 
 import six
@@ -67,6 +68,7 @@ def rmdirs(name, root):
     while name != root:
         try:
             os.rmdir(name)
+            name = os.path.dirname(name)
         except OSError as e:
             if e.errno in (errno.ENOTEMPTY, errno.ENOENT):
                 return

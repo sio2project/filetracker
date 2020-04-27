@@ -112,6 +112,7 @@ class Client(object):
         uname, version = split_name(name)
 
         lock = None
+        delete_lock = False
         if self.local_store:
             lock = self.lock_manager.lock_for(uname)
             if _lock_exclusive:
@@ -146,9 +147,12 @@ class Client(object):
                     self._add_to_cache(vname, save_to)
                 return vname
             raise FiletrackerError("File not available: %s" % name)
+        except FiletrackerError:
+            delete_lock = True
+            raise
         finally:
             if lock:
-                lock.close()
+                lock.close(delete_lock)
             logger.debug('    processed %s in %.2fs', name, time.time() - t)
 
     def get_stream(self, name, force_refresh=False, serve_from_cache=False):
@@ -166,6 +170,7 @@ class Client(object):
         uname, version = split_name(name)
 
         lock = None
+        delete_lock = False
         if self.local_store:
             lock = self.lock_manager.lock_for(uname)
             lock.lock_shared()
@@ -194,9 +199,12 @@ class Client(object):
                     return self.local_store.get_stream(name)
                 return self.remote_store.get_stream(name)
             raise FiletrackerError("File not available: %s" % name)
+        except FiletrackerError:
+            delete_lock = True
+            raise
         finally:
             if lock:
-                lock.close()
+                lock.close(delete_lock)
 
     def file_version(self, name):
         """Returns the newest available version number of the file.
@@ -275,6 +283,7 @@ class Client(object):
         check_name(name)
 
         lock = None
+        delete_lock = True
         if self.local_store:
             lock = self.lock_manager.lock_for(name)
             lock.lock_exclusive()
@@ -285,9 +294,10 @@ class Client(object):
             if (to_remote_store or not self.local_store) and self.remote_store:
                 versioned_name = self.remote_store.add_file(
                         name, filename, compress_hint=compress_hint)
+            delete_lock = False
         finally:
             if lock:
-                lock.close()
+                lock.close(delete_lock)
 
         return versioned_name
 
