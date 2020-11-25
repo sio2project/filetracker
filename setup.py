@@ -11,7 +11,7 @@ setup(
     packages = find_packages(),
 
     install_requires = [
-        'bsddb3',
+        'bsddb3==6.2.7',
         'flup6',
         'gunicorn==19.8.1',
         'gevent==1.3.1',
