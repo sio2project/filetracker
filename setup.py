@@ -7,7 +7,7 @@ with io.open(path.join(path.abspath(path.dirname(__file__)), 'README.md'), encod
 
 setup(
     name = 'filetracker',
-    version = '2.1.3',
+    version = '2.1.4',
     author = 'SIO2 Project Team',
     author_email = 'sio2@sio2project.mimuw.edu.pl',
     description = 'Filetracker caching file storage',
@@ -23,6 +23,7 @@ setup(
         'flup6',
         'gunicorn==19.8.1',
         'gevent==1.3.1',
+        'greenlet==0.4.13', # for compatibility with this version of gevent
         'progressbar2',
         'requests',
         'six',
