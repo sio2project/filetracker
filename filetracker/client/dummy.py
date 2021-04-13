@@ -17,8 +17,8 @@ from filetracker.utils import split_name, versioned_name, check_name
 class DummyDataStore(DataStore):
     """A dummy data store which uses memory to store files.
 
-       Cool for testing, but beware --- do not try to store too much.
-       And this class is not thread-safe, too.
+    Cool for testing, but beware --- do not try to store too much.
+    And this class is not thread-safe, too.
     """
 
     def __init__(self):
@@ -75,8 +75,7 @@ class DummyDataStore(DataStore):
         key, version = self._parse_name(name)
         if version is not None and self.versions[key] != version:
             raise KeyError("Version %s of %s not found" % (version, key))
-        return BytesIO(self.data[key]), \
-               versioned_name(key, self.versions[key])
+        return BytesIO(self.data[key]), versioned_name(key, self.versions[key])
 
     def delete_file(self, name):
         key, version = self._parse_name(name)

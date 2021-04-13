@@ -25,8 +25,8 @@ class MigrateScriptTest(unittest.TestCase):
         os.makedirs(os.path.join(self.temp_dir, 'new_root'))
 
         self.server_process = Process(
-                target=_start_server,
-                args=(os.path.join(self.temp_dir, 'new_root'),))
+            target=_start_server, args=(os.path.join(self.temp_dir, 'new_root'),)
+        )
         self.server_process.start()
         time.sleep(2)
 
@@ -43,12 +43,15 @@ class MigrateScriptTest(unittest.TestCase):
         _touch(os.path.join(self.temp_dir, 'old_root', 'c.txt'))
         _touch(os.path.join(self.temp_dir, 'old_root', 'd.txt'))
 
-        migrate.main([
-            os.path.join(self.temp_dir, 'old_root', 'foo'),
-            self.server_url,
-            '--root',
-            os.path.join(self.temp_dir, 'old_root'),
-            '-s'])
+        migrate.main(
+            [
+                os.path.join(self.temp_dir, 'old_root', 'foo'),
+                self.server_url,
+                '--root',
+                os.path.join(self.temp_dir, 'old_root'),
+                '-s',
+            ]
+        )
 
         self.assertEqual(self.client.get_stream('/foo/a.txt')[0].read(), b'')
         self.assertEqual(self.client.get_stream('/foo/bar/b.txt')[0].read(), b'')
@@ -61,8 +64,10 @@ class MigrateScriptTest(unittest.TestCase):
 
 
 def _start_server(server_dir):
-    server_main(['-p', str(_TEST_PORT_NUMBER), '-d', server_dir, '-D',
-                 '--workers', '4'])
+    server_main(
+        ['-p', str(_TEST_PORT_NUMBER), '-d', server_dir, '-D', '--workers', '4']
+    )
+
 
 def _touch(path):
     with open(path, 'w') as f:

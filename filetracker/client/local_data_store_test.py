@@ -65,8 +65,7 @@ class LocalDataStoreTest(unittest.TestCase):
         real_path = os.path.join(self.dir_path, 'files', 'foo.txt')
         modification_time = int(os.stat(real_path).st_mtime)
 
-        self.assertEqual(
-                self.store.file_version('/foo.txt'), modification_time)
+        self.assertEqual(self.store.file_version('/foo.txt'), modification_time)
 
     def test_file_size_should_return_os_file_size(self):
         self.store.add_stream('/foo.txt', BytesIO(b'hello'))
@@ -74,8 +73,7 @@ class LocalDataStoreTest(unittest.TestCase):
         real_path = os.path.join(self.dir_path, 'files', 'foo.txt')
         real_size = int(os.stat(real_path).st_size)
 
-        self.assertEqual(
-                self.store.file_size('/foo.txt'), real_size)
+        self.assertEqual(self.store.file_size('/foo.txt'), real_size)
 
     def test_get_stream_should_return_error_after_delete_file(self):
         self.store.add_stream('/foo.txt', BytesIO(b'hello'))
@@ -92,8 +90,7 @@ class LocalDataStoreTest(unittest.TestCase):
 
         file_names = []
         for file_info in self.store.list_files():
-            self.assertIsInstance(
-                    file_info, DataStore.FileInfoEntry)
+            self.assertIsInstance(file_info, DataStore.FileInfoEntry)
             self.assertIn('@', file_info.name)
             file_names.append(file_info.name.split('@')[0])
 

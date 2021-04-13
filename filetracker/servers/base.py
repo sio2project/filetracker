@@ -24,7 +24,7 @@ class HttpError(Exception):
 
 class Server(object):
     """A base WSGI-compatible class, which delegates request handling to
-       ``handle_<HTTP-method-name>`` methods."""
+    ``handle_<HTTP-method-name>`` methods."""
 
     def __call__(self, environ, start_response):
         try:
@@ -38,24 +38,20 @@ class Server(object):
 
                 return []
             else:
-                handler = getattr(
-                        self, 'handle_{}'.format(environ['REQUEST_METHOD']))
+                handler = getattr(self, 'handle_{}'.format(environ['REQUEST_METHOD']))
                 return handler(environ, start_response)
 
         except HttpError as e:
             response_headers = [
                 ('Content-Type', 'text/plain'),
-                ('X-Exception', e.description)
+                ('X-Exception', e.description),
             ]
             start_response(e.status, response_headers, sys.exc_info())
             return [traceback.format_exc().encode()]
         except Exception as e:
             logger.error('Unhandled server exception.', exc_info=1)
             status = '500 Oops'
-            response_headers = [
-                ('Content-Type', 'text/plain'),
-                ('X-Exception', str(e))
-            ]
+            response_headers = [('Content-Type', 'text/plain'), ('X-Exception', str(e))]
             start_response(status, response_headers, sys.exc_info())
             return [traceback.format_exc().encode()]
 
@@ -93,6 +89,7 @@ def get_endpoint_and_path(environ):
 # Deprecated, run.py should be used in all cases.
 def start_cgi(server):
     from flup.server.cgi import WSGIServer
+
     WSGIServer(server).run()
     sys.exit(0)
 
@@ -100,6 +97,7 @@ def start_cgi(server):
 # Deprecated, run.py should be used in all cases.
 def start_fcgi(server):
     from flup.server.fcgi import WSGIServer
+
     WSGIServer(server).run()
     sys.exit(0)
 
@@ -107,6 +105,7 @@ def start_fcgi(server):
 # Deprecated, run.py should be used in all cases.
 def start_standalone(server, port=8000):
     from wsgiref.simple_server import make_server
+
     httpd = make_server('', port, server)
     print("Serving on port %d..." % port)
     httpd.serve_forever()
@@ -114,7 +113,7 @@ def start_standalone(server, port=8000):
 
 def main(server):
     """A convenience ``main`` method for running WSGI-compatible HTTP
-       application as CGI, FCGI or standalone (with auto-detection)."""
+    application as CGI, FCGI or standalone (with auto-detection)."""
 
     if 'REQUEST_METHOD' in os.environ:
         start_cgi(server)

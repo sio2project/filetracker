@@ -58,6 +58,7 @@ class FiletrackerFileNotFoundError(Exception):
 
 class ConcurrentModificationError(Exception):
     """Raised after acquiring lock failed multiple times."""
+
     def __init__(self, lock_name):
         message = 'Failed to acquire lock: {}'.format(lock_name)
         super(ConcurrentModificationError, self).__init__(self, message)
@@ -82,31 +83,42 @@ class FileStorage(object):
         self.db_env = bsddb3.db.DBEnv()
         try:
             self.db_env.open(
-                    self.db_dir,
-                    bsddb3.db.DB_CREATE
-                    | bsddb3.db.DB_INIT_LOCK
-                    | bsddb3.db.DB_INIT_LOG
-                    | bsddb3.db.DB_INIT_MPOOL
-                    | bsddb3.db.DB_INIT_TXN
-                    | bsddb3.db.DB_REGISTER)
+                self.db_dir,
+                bsddb3.db.DB_CREATE
+                | bsddb3.db.DB_INIT_LOCK
+                | bsddb3.db.DB_INIT_LOG
+                | bsddb3.db.DB_INIT_MPOOL
+                | bsddb3.db.DB_INIT_TXN
+                | bsddb3.db.DB_REGISTER,
+            )
         except bsddb3.db.DBRunRecoveryError:
             raise RuntimeError(
-                    'DB requires recovery! It should have run in .run.main...')
+                'DB requires recovery! It should have run in .run.main...'
+            )
 
         self.db = bsddb3.db.DB(self.db_env)
         self.db.open(
-                'metadata',
-                dbtype=bsddb3.db.DB_HASH,
-                flags=bsddb3.db.DB_CREATE | bsddb3.db.DB_AUTO_COMMIT)
+            'metadata',
+            dbtype=bsddb3.db.DB_HASH,
+            flags=bsddb3.db.DB_CREATE | bsddb3.db.DB_AUTO_COMMIT,
+        )
 
     def __del__(self):
         self.db.close()
         self.db_env.close()
 
-    def store(self, name, data, version, size=0,
-              compressed=False, digest=None, logical_size=None):
+    def store(
+        self,
+        name,
+        data,
+        version,
+        size=0,
+        compressed=False,
+        digest=None,
+        logical_size=None,
+    ):
         """Adds a new file to the storage.
-        
+
         If the file with the same name existed before, it's not
         guaranteed that the link for the old version will exist until
         the operation completes, but it's guaranteed that the link
@@ -115,7 +127,7 @@ class FileStorage(object):
         Args:
             name: name of the file being stored.
                 May contain slashes that are treated as path separators.
-            data: binary file-like object with file contents. 
+            data: binary file-like object with file contents.
                 Files with unknown length are supported for compatibility with
                 WSGI interface: ``size`` parameter should be passed in these
                 cases.
@@ -142,7 +154,10 @@ class FileStorage(object):
             if _path_exists(link_path) and _file_version(link_path) > version:
                 logger.info(
                     'Tried to store older version of %s (%d < %d), ignoring.',
-                    name, version, _file_version(link_path))
+                    name,
+                    version,
+                    _file_version(link_path),
+                )
                 return _file_version(link_path)
 
             # data is managed by contents now, and shouldn't be used directly
@@ -152,20 +167,17 @@ class FileStorage(object):
                     if compressed:
                         # This shouldn't occur if the request came from a proper
                         # filetracker client, so we don't care if it's slow.
-                        logger.warning(
-                            'Storing compressed stream without hints.')
-                        with gzip.open(
-                                contents.current_path, 'rb') as decompressed:
+                        logger.warning('Storing compressed stream without hints.')
+                        with gzip.open(contents.current_path, 'rb') as decompressed:
                             digest = file_digest(decompressed)
-                        with gzip.open(
-                                contents.current_path, 'rb') as decompressed:
+                        with gzip.open(contents.current_path, 'rb') as decompressed:
                             logical_size = _read_stream_for_size(decompressed)
                     else:
                         digest = file_digest(contents.current_path)
                         logical_size = os.stat(contents.current_path).st_size
 
                 blob_path = self._blob_path(digest)
-                
+
                 with _exclusive_lock(self._lock_path('blobs', digest)):
                     logger.debug('Acquired lock for blob %s.', digest)
                     digest_bytes = digest.encode()
@@ -178,9 +190,10 @@ class FileStorage(object):
 
                         if link_count == 0:
                             self.db.put(
-                                    '{}:logical_size'.format(digest).encode(),
-                                    str(logical_size).encode(),
-                                    txn=txn)
+                                '{}:logical_size'.format(digest).encode(),
+                                str(logical_size).encode(),
+                                txn=txn,
+                            )
                         logger.debug('Commiting DB transaction (adding link).')
 
                     logger.debug('Committed DB transaction (adding link).')
@@ -194,8 +207,9 @@ class FileStorage(object):
                             contents.save(blob_path)
                         else:
                             contents.save()
-                            with open(contents.current_path, 'rb') as raw,\
-                                    gzip.open(blob_path, 'wb') as blob:
+                            with open(contents.current_path, 'rb') as raw, gzip.open(
+                                blob_path, 'wb'
+                            ) as blob:
                                 shutil.copyfileobj(raw, blob)
 
                 logger.debug('Released lock for blob %s.', digest)
@@ -208,8 +222,7 @@ class FileStorage(object):
                 self.delete(name, version, _lock=False)
 
             _create_file_dirs(link_path)
-            rel_blob_path = os.path.relpath(blob_path,
-                                            os.path.dirname(link_path))
+            rel_blob_path = os.path.relpath(blob_path, os.path.dirname(link_path))
             os.symlink(rel_blob_path, link_path)
 
             logger.debug('Created link %s.', name)
@@ -245,7 +258,10 @@ class FileStorage(object):
             if _file_version(link_path) > version:
                 logger.info(
                     'Tried to delete newer version of %s (%d < %d), ignoring.',
-                    name, version, _file_version(link_path))
+                    name,
+                    version,
+                    _file_version(link_path),
+                )
                 return False
 
             digest = self._digest_for_link(name)
@@ -266,8 +282,8 @@ class FileStorage(object):
                         logger.debug('Deleting last link to blob %s.', digest)
                         self.db.delete(digest_bytes, txn=txn)
                         self.db.delete(
-                                '{}:logical_size'.format(digest).encode(),
-                                txn=txn)
+                            '{}:logical_size'.format(digest).encode(), txn=txn
+                        )
                         should_delete_blob = True
                     else:
                         new_count = str(link_count - 1).encode()
@@ -301,8 +317,7 @@ class FileStorage(object):
         if logical_size:
             return int(logical_size.decode())
         else:
-            raise RuntimeError(
-                    'Blob doesn\'t have :logical_size in DB: try recovering')
+            raise RuntimeError('Blob doesn\'t have :logical_size in DB: try recovering')
 
     def _link_path(self, name):
         return os.path.join(self.links_dir, name)
@@ -333,9 +348,10 @@ class FileStorage(object):
 
 class _InputStreamWrapper(object):
     """A wrapper for lazy reading and moving contents of 'wsgi.input'.
-    
+
     Should be used as a context manager.
     """
+
     def __init__(self, data, size):
         self._data = data
         self._size = size
@@ -419,7 +435,7 @@ def _create_file_dirs(file_path):
 
 def _path_exists(path):
     """Checks if the path exists
-       - is a file, a directory or a symbolic link that may be broken."""
+    - is a file, a directory or a symbolic link that may be broken."""
     return os.path.exists(path) or os.path.islink(path)
 
 
@@ -466,7 +482,7 @@ def _exclusive_lock(path):
 @contextlib.contextmanager
 def _no_lock():
     """Does nothing, just runs the code within the `with` statement.
-       Used for conditional locking."""
+    Used for conditional locking."""
     yield
 
 

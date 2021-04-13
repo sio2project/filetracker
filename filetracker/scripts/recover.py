@@ -36,11 +36,19 @@ _ACTION_LENGTH = 25
 def main(argv=None):
     parser = argparse.ArgumentParser(description=_DESCRIPTION)
     parser.add_argument('root', help='root directory of filetracker storage')
-    parser.add_argument('-s', '--silent', action='store_true',
-            help='if set, progress bar is not printed')
-    parser.add_argument('-f', '--full', action='store_true',
-            help='if set, logical size of all blobs is recalculated '
-                 '(this may take a lot of time)')
+    parser.add_argument(
+        '-s',
+        '--silent',
+        action='store_true',
+        help='if set, progress bar is not printed',
+    )
+    parser.add_argument(
+        '-f',
+        '--full',
+        action='store_true',
+        help='if set, logical size of all blobs is recalculated '
+        '(this may take a lot of time)',
+    )
 
     args = parser.parse_args(argv)
     root = args.root
@@ -55,18 +63,21 @@ def main(argv=None):
     db = file_storage.db
 
     links_widgets = [
-            ' [', progress_bar.Timer(format='Time: %(elapsed)s'), '] ',
-            ' Checking links '.ljust(_ACTION_LENGTH),
-            ' ', progress_bar.Counter(), ' ',
-            progress_bar.BouncingBar()
+        ' [',
+        progress_bar.Timer(format='Time: %(elapsed)s'),
+        '] ',
+        ' Checking links '.ljust(_ACTION_LENGTH),
+        ' ',
+        progress_bar.Counter(),
+        ' ',
+        progress_bar.BouncingBar(),
     ]
 
     processed_links = 0
     broken_links = 0
     blob_links = {}
 
-    with progress_bar.conditional(show=not silent,
-                                  widgets=links_widgets) as bar:
+    with progress_bar.conditional(show=not silent, widgets=links_widgets) as bar:
         for cur_dir, _, files in os.walk(file_storage.links_dir):
             for file_name in files:
                 link_path = os.path.join(cur_dir, file_name)
@@ -78,10 +89,13 @@ def main(argv=None):
                     broken_links += 1
                 else:
                     blob_path = os.path.join(
-                            os.path.dirname(link_path), os.readlink(link_path))
-                    if (os.path.islink(blob_path)
-                            or not os.path.exists(blob_path)
-                            or 'blobs/' not in blob_path):
+                        os.path.dirname(link_path), os.readlink(link_path)
+                    )
+                    if (
+                        os.path.islink(blob_path)
+                        or not os.path.exists(blob_path)
+                        or 'blobs/' not in blob_path
+                    ):
                         os.unlink(link_path)
                         broken_links += 1
                     else:
@@ -95,17 +109,20 @@ def main(argv=None):
         db.put(digest.encode(), str(link_count).encode())
 
     blobs_widgets = [
-            ' [', progress_bar.Timer(format='Time: %(elapsed)s'), '] ',
-            ' Checking blobs '.ljust(_ACTION_LENGTH),
-            ' ', progress_bar.Counter(), ' ',
-            progress_bar.BouncingBar()
+        ' [',
+        progress_bar.Timer(format='Time: %(elapsed)s'),
+        '] ',
+        ' Checking blobs '.ljust(_ACTION_LENGTH),
+        ' ',
+        progress_bar.Counter(),
+        ' ',
+        progress_bar.BouncingBar(),
     ]
 
     processed_blobs = 0
     broken_blobs = 0
 
-    with progress_bar.conditional(show=not silent,
-                                  widgets=blobs_widgets) as bar:
+    with progress_bar.conditional(show=not silent, widgets=blobs_widgets) as bar:
         for cur_dir, _, files in os.walk(file_storage.blobs_dir):
             for blob_name in files:
                 if blob_name not in blob_links:
@@ -125,13 +142,16 @@ def main(argv=None):
                 bar.update(processed_blobs)
 
     if not silent:
-        print('Completed, {} broken links and {} stray blobs found.'.format(
-            broken_links, broken_blobs))
+        print(
+            'Completed, {} broken links and {} stray blobs found.'.format(
+                broken_links, broken_blobs
+            )
+        )
 
 
 def ensure_storage_format(root_dir):
     """Checks if the directory looks like a filetracker storage.
-    
+
     Exits with error if it doesn't.
     """
     if not os.path.isdir(os.path.join(root_dir, 'blobs')):
