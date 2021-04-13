@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 class MigrationFiletrackerServer(FiletrackerServer):
     """A WSGI application providing a HTTP server compatible with
-       :class:`filetracker.RemoteDataStore`
-       that redirects GET requests for missing files to another server."""
+    :class:`filetracker.RemoteDataStore`
+    that redirects GET requests for missing files to another server."""
 
     def __init__(self, redirect_url, dir=None):
         super(MigrationFiletrackerServer, self).__init__(dir)

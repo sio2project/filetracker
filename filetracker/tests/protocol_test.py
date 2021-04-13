@@ -27,15 +27,15 @@ class ProtocolTest(unittest.TestCase):
         cls.server_dir = tempfile.mkdtemp()
         cls.temp_dir = tempfile.mkdtemp()
 
-        cls.server_process = Process(
-                target=_start_server, args=(cls.server_dir,))
+        cls.server_process = Process(target=_start_server, args=(cls.server_dir,))
         cls.server_process.start()
-        time.sleep(2)   # give server some time to start
+        time.sleep(2)  # give server some time to start
 
         # We use a client to set up test environments.
         cls.client = Client(
-                cache_dir=cls.cache_dir,
-                remote_url='http://127.0.0.1:{}'.format(_TEST_PORT_NUMBER))
+            cache_dir=cls.cache_dir,
+            remote_url='http://127.0.0.1:{}'.format(_TEST_PORT_NUMBER),
+        )
 
     @classmethod
     def tearDownClass(cls):
@@ -59,8 +59,7 @@ class ProtocolTest(unittest.TestCase):
         self.client.put_file('/list_a.txt', src_file)
         self.client.put_file('/list_b.txt', src_file)
 
-        res = requests.get(
-                'http://127.0.0.1:{}/list/'.format(_TEST_PORT_NUMBER))
+        res = requests.get('http://127.0.0.1:{}/list/'.format(_TEST_PORT_NUMBER))
         self.assertEqual(res.status_code, 200)
 
         lines = [l for l in res.text.split('\n') if l]
@@ -78,8 +77,8 @@ class ProtocolTest(unittest.TestCase):
         self.client.put_file('/should_not_be_listed', src_file)
 
         res = requests.get(
-                'http://127.0.0.1:{}/list/sub/direct/'
-                .format(_TEST_PORT_NUMBER))
+            'http://127.0.0.1:{}/list/sub/direct/'.format(_TEST_PORT_NUMBER)
+        )
         self.assertEqual(res.status_code, 200)
 
         lines = [l for l in res.text.split('\n') if l]
@@ -91,5 +90,6 @@ class ProtocolTest(unittest.TestCase):
 
 
 def _start_server(server_dir):
-    server_main(['-p', str(_TEST_PORT_NUMBER), '-d', server_dir, '-D',
-                 '--workers', '4'])
+    server_main(
+        ['-p', str(_TEST_PORT_NUMBER), '-d', server_dir, '-D', '--workers', '4']
+    )

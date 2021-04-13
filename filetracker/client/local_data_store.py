@@ -5,15 +5,14 @@ import shutil
 
 from filetracker.client import FiletrackerError
 from filetracker.client.data_store import DataStore
-from filetracker.utils import split_name, versioned_name, check_name, mkdir, \
-        rmdirs
+from filetracker.utils import split_name, versioned_name, check_name, mkdir, rmdirs
 
 
 class LocalDataStore(DataStore):
     """Data store which uses local filesystem.
 
-       The files are saved under ``<base_dir>/files``, where ``base_dir`` can
-       be passed to the constructor.
+    The files are saved under ``<base_dir>/files``, where ``base_dir`` can
+    be passed to the constructor.
     """
 
     def __init__(self, dir):
@@ -28,8 +27,7 @@ class LocalDataStore(DataStore):
 
     def add_stream(self, name, stream):
         path, version = self._parse_name(name)
-        return versioned_name(
-                split_name(name)[0], _save_stream(path, stream, version))
+        return versioned_name(split_name(name)[0], _save_stream(path, stream, version))
 
     def get_stream(self, name):
         path, version = self._parse_name(name)
@@ -79,16 +77,16 @@ class LocalDataStore(DataStore):
         for root, _dirs, files in os.walk(self.dir):
             for basename in files:
                 relative_dir = os.path.relpath(root, self.dir)
-                store_dir = os.path.normpath(
-                    os.path.join('/', relative_dir))
+                store_dir = os.path.normpath(os.path.join('/', relative_dir))
                 name = os.path.join(store_dir, basename)
                 path, version = self._parse_name(name)
                 file_stat = os.lstat(path)
                 vname = versioned_name(name, self.file_version(name))
                 result.append(
-                    DataStore.FileInfoEntry(name=vname,
-                                            mtime=file_stat.st_mtime,
-                                            size=file_stat.st_size))
+                    DataStore.FileInfoEntry(
+                        name=vname, mtime=file_stat.st_mtime, size=file_stat.st_size
+                    )
+                )
         return result
 
 
@@ -96,8 +94,7 @@ def _save_stream(path, stream, version=None):
     dir = os.path.dirname(path)
     if dir:
         mkdir(dir)
-    if os.path.exists(path) and version is not None \
-            and _file_version(path) >= version:
+    if os.path.exists(path) and version is not None and _file_version(path) >= version:
         return version
     if hasattr(stream, 'name') and os.path.exists(stream.name):
         try:

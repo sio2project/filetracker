@@ -28,8 +28,9 @@ class RecoveryScriptTest(unittest.TestCase):
         _touch_hello_gz(os.path.join(self.temp_dir, 'blobs', '00', '0000'))
 
         os.symlink(
-                os.path.join(self.temp_dir, 'blobs', '00', '0000'),
-                os.path.join(self.temp_dir, 'links', '0.txt'))
+            os.path.join(self.temp_dir, 'blobs', '00', '0000'),
+            os.path.join(self.temp_dir, 'links', '0.txt'),
+        )
 
         recover.main([self.temp_dir, '-s', '-f'])
 
@@ -42,23 +43,24 @@ class RecoveryScriptTest(unittest.TestCase):
         _touch_hello_gz(os.path.join(self.temp_dir, 'blobs', '00', '0000'))
 
         os.symlink(
-                os.path.join(self.temp_dir, 'blobs', '00', '0000'),
-                os.path.join(self.temp_dir, 'links', '0.txt'))
+            os.path.join(self.temp_dir, 'blobs', '00', '0000'),
+            os.path.join(self.temp_dir, 'links', '0.txt'),
+        )
 
         os.unlink(os.path.join(self.temp_dir, 'blobs', '00', '0000'))
 
         recover.main([self.temp_dir, '-s', '-f'])
 
-        self.assertFalse(os.path.islink(
-            os.path.join(self.temp_dir, 'links', '0.txt')))
+        self.assertFalse(os.path.islink(os.path.join(self.temp_dir, 'links', '0.txt')))
 
     def test_should_remove_stray_blobs(self):
         _touch_hello_gz(os.path.join(self.temp_dir, 'blobs', '00', '0000'))
 
         recover.main([self.temp_dir, '-s', '-f'])
 
-        self.assertFalse(os.path.exists(
-            os.path.join(self.temp_dir, 'blobs', '00', '0000')))
+        self.assertFalse(
+            os.path.exists(os.path.join(self.temp_dir, 'blobs', '00', '0000'))
+        )
 
 
 def _touch_hello_gz(path):

@@ -17,8 +17,7 @@ from six.moves.urllib.parse import urlencode
 
 from filetracker.client import FiletrackerError
 from filetracker.client.data_store import DataStore
-from filetracker.utils import (split_name, versioned_name, check_name,
-                               file_digest)
+from filetracker.utils import split_name, versioned_name, check_name, file_digest
 
 logger = logging.getLogger('filetracker')
 
@@ -49,7 +48,7 @@ _PROTOCOL_CAPABILITIES = {
         SERVER_ACCEPTS_GZIP,
         SERVER_ACCEPTS_SHA256_DIGEST,
         SERVER_ACCEPTS_DELETE,
-    ]
+    ],
 }
 
 
@@ -80,7 +79,9 @@ def _report_timing(name):
             elapsed = time.time() - t
             logger.debug('    %s took %.2fs', name, elapsed)
             return ret
+
         return wrapped
+
     return decorator
 
 
@@ -104,8 +105,7 @@ class RemoteDataStore(DataStore):
         return last_modified
 
     def add_stream(self, name, stream):
-        raise RuntimeError("RemoteDataStore does not support streaming "
-                           "uploads")
+        raise RuntimeError("RemoteDataStore does not support streaming " "uploads")
 
     @_report_timing('RemoteDataStore.add_file')
     @_verbose_http_errors
@@ -114,16 +114,14 @@ class RemoteDataStore(DataStore):
 
         headers = {}
 
-        if (compress_hint
-                and self._has_capability(SERVER_ACCEPTS_SHA256_DIGEST)):
+        if compress_hint and self._has_capability(SERVER_ACCEPTS_SHA256_DIGEST):
             headers['SHA256-Checksum'] = file_digest(filename)
 
         # Important detail: this upload is streaming.
         # http://docs.python-requests.org/en/latest/user/advanced/#streaming-uploads
 
         with open(filename, 'rb') as f:
-            if (compress_hint
-                    and self._has_capability(SERVER_ACCEPTS_GZIP)):
+            if compress_hint and self._has_capability(SERVER_ACCEPTS_GZIP):
                 # Unfortunately it seems a temporary file is required here.
                 # Our server requires Content-Length to be present, because
                 # some WSGI implementations (among others the one used in
@@ -161,10 +159,14 @@ class RemoteDataStore(DataStore):
         response.raise_for_status()
 
         remote_version = self._parse_last_modified(response)
-        if version is not None and remote_version is not None \
-                and version != remote_version:
-            raise FiletrackerError("Version %s not available. Server has %s" \
-                    % (name, remote_version))
+        if (
+            version is not None
+            and remote_version is not None
+            and version != remote_version
+        ):
+            raise FiletrackerError(
+                "Version %s not available. Server has %s" % (name, remote_version)
+            )
         name, version = split_name(name)
 
         stream = _FileLikeFromResponse(response)
@@ -177,10 +179,12 @@ class RemoteDataStore(DataStore):
             return False
 
         remote_version = self._parse_last_modified(response)
-        if (version is not None
-                and remote_version is not None
-                and version != remote_version):
-                    return False
+        if (
+            version is not None
+            and remote_version is not None
+            and version != remote_version
+        ):
+            return False
         return True
 
     @_verbose_http_errors
@@ -220,9 +224,7 @@ class RemoteDataStore(DataStore):
             new_headers['Last-Modified'] = email.utils.formatdate(version)
             return url, new_headers
         else:
-            url_params = {
-                'last_modified': email.utils.formatdate(version)
-            }
+            url_params = {'last_modified': email.utils.formatdate(version)}
             new_url = url + "?" + urlencode(url_params)
             return new_url, headers
 
@@ -243,16 +245,19 @@ class RemoteDataStore(DataStore):
             server_versions = set(response.json()['protocol_versions'])
             if not server_versions:
                 raise FiletrackerError(
-                        'Server hasn\'t reported any supported protocols')
+                    'Server hasn\'t reported any supported protocols'
+                )
         else:
             response.raise_for_status()
 
         common_versions = _SUPPORTED_VERSIONS.intersection(server_versions)
         if not common_versions:
             raise FiletrackerError(
-                    'Couldn\'t agree on protocol version: client supports '
-                    '{}, server supports {}.'
-                    .format(_PROTOCOL_CAPABILITIES, server_versions))
+                'Couldn\'t agree on protocol version: client supports '
+                '{}, server supports {}.'.format(
+                    _PROTOCOL_CAPABILITIES, server_versions
+                )
+            )
 
         self._protocol_ver = max(common_versions)
         print('Settled for protocol version {}'.format(self._protocol_ver))
@@ -269,7 +274,7 @@ class RemoteDataStore(DataStore):
 
 class _FileLikeFromResponse(object):
     def __init__(self, response):
-        self.iter = response.iter_content(chunk_size=16*1024)
+        self.iter = response.iter_content(chunk_size=16 * 1024)
         self.data = b''
 
     def read(self, size=None):

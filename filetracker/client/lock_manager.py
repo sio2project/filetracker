@@ -9,7 +9,7 @@ from filetracker.utils import split_name, check_name, mkdir, rmdirs
 class LockManager(object):
     """An abstract class representing a lock manager.
 
-       Lock manager is basically a factory of :class:`LockManager.Lock` instances.
+    Lock manager is basically a factory of :class:`LockManager.Lock` instances.
     """
 
     class Lock(object):
@@ -30,19 +30,19 @@ class LockManager(object):
         def close(self, delete=False):
             """Unlocks the file and releases any system resources.
 
-               If ``delete`` is ``True``, also removes the underlying
-               lock file or equivalent.
+            If ``delete`` is ``True``, also removes the underlying
+            lock file or equivalent.
 
-               May be called more than once (it's a no-op then).
+            May be called more than once (it's a no-op then).
             """
             pass
 
     def lock_for(self, name):
         """Returns a :class:`LockManager.Lock` bound to the passed file.
 
-           Locks are not versioned -- there should be a single lock for
-           all versions of the given name. The argument ``name`` may contain
-           version specification, but it must be ignored.
+        Locks are not versioned -- there should be a single lock for
+        all versions of the given name. The argument ``name`` may contain
+        version specification, but it must be ignored.
         """
         raise NotImplementedError
 
@@ -101,8 +101,9 @@ class FcntlLockManager(LockManager):
         mkdir(dir)
 
         # All mkdirs, opens, rmdirs and unlinks must be guarded by this lock
-        self.tree_lock_fd = os.open(os.path.join(dir, 'tree.lock'),
-                os.O_WRONLY | os.O_CREAT, 0o600)
+        self.tree_lock_fd = os.open(
+            os.path.join(dir, 'tree.lock'), os.O_WRONLY | os.O_CREAT, 0o600
+        )
 
     def __del__(self):
         os.close(self.tree_lock_fd)
@@ -117,8 +118,8 @@ class FcntlLockManager(LockManager):
 class NoOpLockManager(LockManager):
     """A no-op :class:`LockManager`.
 
-       It may be used when no local store is configured, as we probably do not
-       need concurrency control.
+    It may be used when no local store is configured, as we probably do not
+    need concurrency control.
     """
 
     class NoOpLock(LockManager.Lock):

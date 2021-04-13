@@ -32,10 +32,15 @@ def main(args=None):
     parser = argparse.ArgumentParser(description=_DESCRIPTION)
     parser.add_argument('files', help='file tree to be uploaded')
     parser.add_argument('url', help='URL of the filetracker server')
-    parser.add_argument('--root',
-            help='the directory that corresponds to the storage root')
-    parser.add_argument('-s', '--silent', action='store_true',
-            help='if set, progress bar is not printed')
+    parser.add_argument(
+        '--root', help='the directory that corresponds to the storage root'
+    )
+    parser.add_argument(
+        '-s',
+        '--silent',
+        action='store_true',
+        help='if set, progress bar is not printed',
+    )
 
     args = parser.parse_args(args)
 
@@ -54,33 +59,44 @@ def main(args=None):
     total_size = 0
 
     size_widgets = [
-            ' [', progress_bar.ShortTimer(), '] ',
-            ' Calculating file size '.ljust(_ACTION_LENGTH),
-            ' ', progress_bar.DataSize(), ' ',
-            progress_bar.BouncingBar(),
+        ' [',
+        progress_bar.ShortTimer(),
+        '] ',
+        ' Calculating file size '.ljust(_ACTION_LENGTH),
+        ' ',
+        progress_bar.DataSize(),
+        ' ',
+        progress_bar.BouncingBar(),
     ]
 
-    with progress_bar.conditional(show=not silent,
-                                  widgets=size_widgets) as bar:
+    with progress_bar.conditional(show=not silent, widgets=size_widgets) as bar:
         for cur_dir, _, files in os.walk(upload_root):
             for file_name in files:
                 total_size += os.path.getsize(os.path.join(cur_dir, file_name))
                 bar.update(total_size)
 
     upload_widgets = [
-            ' [', progress_bar.ShortTimer(), '] ',
-            ' Uploading files '.ljust(_ACTION_LENGTH),
-            ' ', progress_bar.DataSize(), ' ',
-            progress_bar.Bar(),
-            ' ', progress_bar.Percentage(), ' ',
-            ' (', progress_bar.AdaptiveETA(), ') ',
+        ' [',
+        progress_bar.ShortTimer(),
+        '] ',
+        ' Uploading files '.ljust(_ACTION_LENGTH),
+        ' ',
+        progress_bar.DataSize(),
+        ' ',
+        progress_bar.Bar(),
+        ' ',
+        progress_bar.Percentage(),
+        ' ',
+        ' (',
+        progress_bar.AdaptiveETA(),
+        ') ',
     ]
 
     processed_size = 0
 
-    with progress_bar.conditional(show=not silent,
-                                  max_value=total_size,
-                                  widgets=upload_widgets) as bar:
+    with progress_bar.conditional(
+        show=not silent, max_value=total_size, widgets=upload_widgets
+    ) as bar:
         for cur_dir, _, files in os.walk(upload_root):
             for file_name in files:
                 file_path = os.path.join(cur_dir, file_name)
@@ -95,8 +111,10 @@ def main(args=None):
                 try:
                     client.put_file(remote_name, file_path, to_local_store=False)
                 except FiletrackerError as e:
-                    print('ERROR when uploading {}:\n{}'.format(file_path, e),
-                          file=sys.stderr)
+                    print(
+                        'ERROR when uploading {}:\n{}'.format(file_path, e),
+                        file=sys.stderr,
+                    )
 
                 processed_size += file_size
                 bar.update(processed_size)

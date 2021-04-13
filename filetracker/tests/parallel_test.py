@@ -33,16 +33,16 @@ class ParallelTest(unittest.TestCase):
         cls.server_dir = tempfile.mkdtemp()
         cls.temp_dir = tempfile.mkdtemp()
 
-        cls.server_process = Process(
-                target=_start_server, args=(cls.server_dir,))
+        cls.server_process = Process(target=_start_server, args=(cls.server_dir,))
         cls.server_process.start()
-        time.sleep(1)   # give server some time to start
+        time.sleep(1)  # give server some time to start
 
         cls.clients = []
         for _ in range(_PARALLEL_CLIENTS):
             client = Client(
-                    local_store=None,
-                    remote_url='http://127.0.0.1:{}'.format(_TEST_PORT_NUMBER))
+                local_store=None,
+                remote_url='http://127.0.0.1:{}'.format(_TEST_PORT_NUMBER),
+            )
 
             # A hack to avoid negotiating version (making a request), because
             # it slows down client spawn time significantly.
@@ -79,8 +79,9 @@ class ParallelTest(unittest.TestCase):
         for i, client in enumerate(self.clients):
             temp_file = os.path.join(self.temp_dir, 'foo{}.txt'.format(i))
             ft_name = '/foo.txt@{}'.format(i)
-            process = Process(target=lambda: client.put_file(
-                ft_name, temp_file, compress_hint=False))
+            process = Process(
+                target=lambda: client.put_file(ft_name, temp_file, compress_hint=False)
+            )
             process.start()
             processes.append(process)
             time.sleep(_CLIENT_WAIT_S)
@@ -90,12 +91,14 @@ class ParallelTest(unittest.TestCase):
 
         f, _ = self.client.get_stream('/foo.txt')
         last_file = os.path.join(
-                self.temp_dir, 'foo{}.txt'.format(_PARALLEL_CLIENTS - 1))
+            self.temp_dir, 'foo{}.txt'.format(_PARALLEL_CLIENTS - 1)
+        )
 
         with open(last_file, 'rb') as lf:
             self.assertEqual(f.read(), lf.read())
 
 
 def _start_server(server_dir):
-    server_main(['-p', str(_TEST_PORT_NUMBER), '-d', server_dir, '-D',
-                 '--workers', '6'])
+    server_main(
+        ['-p', str(_TEST_PORT_NUMBER), '-d', server_dir, '-D', '--workers', '6']
+    )

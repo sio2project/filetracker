@@ -24,14 +24,14 @@ class InteractionTest(unittest.TestCase):
         cls.server_dir = tempfile.mkdtemp()
         cls.temp_dir = tempfile.mkdtemp()
 
-        cls.server_process = Process(
-                target=_start_server, args=(cls.server_dir,))
+        cls.server_process = Process(target=_start_server, args=(cls.server_dir,))
         cls.server_process.start()
-        time.sleep(2)   # give server some time to start
+        time.sleep(2)  # give server some time to start
 
         cls.client = Client(
-                cache_dir=cls.cache_dir,
-                remote_url='http://127.0.0.1:{}'.format(_TEST_PORT_NUMBER))
+            cache_dir=cls.cache_dir,
+            remote_url='http://127.0.0.1:{}'.format(_TEST_PORT_NUMBER),
+        )
 
     @classmethod
     def tearDownClass(cls):
@@ -128,12 +128,11 @@ class InteractionTest(unittest.TestCase):
     def test_file_size_should_return_decompressed_size_without_cache(self):
         src_file = os.path.join(self.temp_dir, 'size.txt')
         with open(src_file, 'wb') as sf:
-            sf.write(b'hello size')     # size = 10
+            sf.write(b'hello size')  # size = 10
 
         self.client.put_file('/size.txt', src_file, to_local_store=False)
 
-        self.assertEqual(
-                self.client.file_size('/size.txt'), len(b'hello size'))
+        self.assertEqual(self.client.file_size('/size.txt'), len(b'hello size'))
 
     def test_every_link_should_have_independent_version(self):
         src_file = os.path.join(self.temp_dir, 'foo.txt')
@@ -191,14 +190,18 @@ class InteractionTest(unittest.TestCase):
 
         for d in (self.cache_dir, self.server_dir):
             for f in ('files', 'locks'):
-                self.assertFalse(os.path.exists(os.path.join(d, f, 'dir')),
-                        "{}/{}/dir not deleted ({})".format(d, f,
-                            d == self.cache_dir and "cache" or "server"))
+                self.assertFalse(
+                    os.path.exists(os.path.join(d, f, 'dir')),
+                    "{}/{}/dir not deleted ({})".format(
+                        d, f, d == self.cache_dir and "cache" or "server"
+                    ),
+                )
 
         with self.assertRaisesRegexp(FiletrackerError, "404"):
             self.client.get_stream('/dir/del.txt')
 
 
 def _start_server(server_dir):
-    server_main(['-p', str(_TEST_PORT_NUMBER), '-d', server_dir, '-D',
-                 '--workers', '4'])
+    server_main(
+        ['-p', str(_TEST_PORT_NUMBER), '-d', server_dir, '-D', '--workers', '4']
+    )

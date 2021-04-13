@@ -73,8 +73,7 @@ class FileStorageTest(unittest.TestCase):
         storage_path_a = os.path.join(self.temp_dir, 'links', 'hello.txt')
         storage_path_b = os.path.join(self.temp_dir, 'links', 'world.txt')
 
-        self.assertEqual(os.readlink(storage_path_a),
-                         os.readlink(storage_path_b))
+        self.assertEqual(os.readlink(storage_path_a), os.readlink(storage_path_b))
 
     def test_store_should_accept_digest_hints(self):
         storage = FileStorage(self.temp_dir)
@@ -89,8 +88,7 @@ class FileStorageTest(unittest.TestCase):
         storage_path_a = os.path.join(self.temp_dir, 'links', 'hello.txt')
         storage_path_b = os.path.join(self.temp_dir, 'links', 'world.txt')
 
-        self.assertEqual(os.readlink(storage_path_a),
-                         os.readlink(storage_path_b))
+        self.assertEqual(os.readlink(storage_path_a), os.readlink(storage_path_b))
 
     def test_store_should_set_modified_time_to_version(self):
         storage = FileStorage(self.temp_dir)

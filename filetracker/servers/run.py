@@ -78,38 +78,78 @@ _DEFAULT_LOG_CONFIG_JSON = """
 }
 """
 
+
 def strip_margin(text):
     return re.sub('\n[ \t]*\|', '\n', text)
 
 
 def main(args=None):
     parser = OptionParser()
-    parser.add_option('-p', '--port', dest='port', default=DEFAULT_PORT,
-            type='int',
-            help="Listen on specified port number")
-    parser.add_option('-l', '--listen-on', dest='listen_on',
-            default='127.0.0.1',
-            help="Listen on specified address")
-    parser.add_option('-d', '--dir', dest='dir', default=None,
-            help="Specify Filetracker dir (taken from FILETRACKER_DIR "
-                 "environment variable if not present)")
-    parser.add_option('-L', '--log', dest='log', default=None,
-            help="Log file location (default: stdout)")
-    parser.add_option('--log-level', dest='log_level', default='INFO',
-            help="Log level (default: INFO)")
-    parser.add_option('--log-config', dest='log_config', default=None,
-            help="Logging configuration (in JSON). "
-                 "Takes precedence over other logging flags")
-    parser.add_option('-D', '--no-daemon', dest='daemonize',
-            action='store_false', default=True,
-            help="Do not daemonize, stay in foreground")
-    parser.add_option('--fallback-url', dest='fallback_url',
-            default=None,
-            help="Turns on migration mode "
-                 "and redirects requests to nonexistent files to the remote")
-    parser.add_option('--workers', dest='workers', type='int',
-            default=2 * multiprocessing.cpu_count(),
-            help="Specifies the amount of worker processes to use")
+    parser.add_option(
+        '-p',
+        '--port',
+        dest='port',
+        default=DEFAULT_PORT,
+        type='int',
+        help="Listen on specified port number",
+    )
+    parser.add_option(
+        '-l',
+        '--listen-on',
+        dest='listen_on',
+        default='127.0.0.1',
+        help="Listen on specified address",
+    )
+    parser.add_option(
+        '-d',
+        '--dir',
+        dest='dir',
+        default=None,
+        help="Specify Filetracker dir (taken from FILETRACKER_DIR "
+        "environment variable if not present)",
+    )
+    parser.add_option(
+        '-L',
+        '--log',
+        dest='log',
+        default=None,
+        help="Log file location (default: stdout)",
+    )
+    parser.add_option(
+        '--log-level',
+        dest='log_level',
+        default='INFO',
+        help="Log level (default: INFO)",
+    )
+    parser.add_option(
+        '--log-config',
+        dest='log_config',
+        default=None,
+        help="Logging configuration (in JSON). "
+        "Takes precedence over other logging flags",
+    )
+    parser.add_option(
+        '-D',
+        '--no-daemon',
+        dest='daemonize',
+        action='store_false',
+        default=True,
+        help="Do not daemonize, stay in foreground",
+    )
+    parser.add_option(
+        '--fallback-url',
+        dest='fallback_url',
+        default=None,
+        help="Turns on migration mode "
+        "and redirects requests to nonexistent files to the remote",
+    )
+    parser.add_option(
+        '--workers',
+        dest='workers',
+        type='int',
+        default=2 * multiprocessing.cpu_count(),
+        help="Specifies the amount of worker processes to use",
+    )
     options, args = parser.parse_args(args)
     if args:
         parser.error("Unrecognized arguments: " + ' '.join(args))
@@ -144,7 +184,8 @@ def main(args=None):
     if not os.path.exists(docroot):
         os.makedirs(docroot, 0o700)
 
-    gunicorn_settings = strip_margin("""
+    gunicorn_settings = strip_margin(
+        """
         |import logging
         |import os
         |import signal
@@ -167,14 +208,15 @@ def main(args=None):
         |        'worker_exit() hook: sending SIGTERM to gunicorn server')
         |    os.kill(os.getppid(), signal.SIGTERM)
         """.format(
-        listen_on=options.listen_on,
-        port=options.port,
-        daemonize=options.daemonize,
-        workers=options.workers,
-        filetracker_dir=options.dir,
-        fallback_url=options.fallback_url,
-        logconfig_dict=repr(log_config),
-    ))
+            listen_on=options.listen_on,
+            port=options.port,
+            daemonize=options.daemonize,
+            workers=options.workers,
+            filetracker_dir=options.dir,
+            fallback_url=options.fallback_url,
+            logconfig_dict=repr(log_config),
+        )
+    )
 
     db_init(os.path.join(options.dir, 'db'))
 
@@ -214,14 +256,15 @@ def db_init(db_dir):
     mkdir(db_dir)
     db_env = bsddb3.db.DBEnv()
     db_env.open(
-            db_dir,
-            bsddb3.db.DB_CREATE
-            | bsddb3.db.DB_INIT_LOCK
-            | bsddb3.db.DB_INIT_LOG
-            | bsddb3.db.DB_INIT_MPOOL
-            | bsddb3.db.DB_INIT_TXN
-            | bsddb3.db.DB_REGISTER
-            | bsddb3.db.DB_RECOVER)
+        db_dir,
+        bsddb3.db.DB_CREATE
+        | bsddb3.db.DB_INIT_LOCK
+        | bsddb3.db.DB_INIT_LOG
+        | bsddb3.db.DB_INIT_MPOOL
+        | bsddb3.db.DB_INIT_TXN
+        | bsddb3.db.DB_REGISTER
+        | bsddb3.db.DB_RECOVER,
+    )
     db_env.close()
     logger.info('Successfully created and/or initialized database.')
 
@@ -245,9 +288,7 @@ def gunicorn_entry_migration(env, start_response):
         fallback = os.environ.get('FILETRACKER_FALLBACK_URL', None)
         if not fallback:
             raise RuntimeError('Configuration error. Fallback url not set.')
-        filetracker_instance = MigrationFiletrackerServer(
-            redirect_url=fallback
-        )
+        filetracker_instance = MigrationFiletrackerServer(redirect_url=fallback)
     return filetracker_instance(env, start_response)
 
 

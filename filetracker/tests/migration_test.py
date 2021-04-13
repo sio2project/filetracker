@@ -28,24 +28,24 @@ class MigrationTest(unittest.TestCase):
         cls.temp_dir = tempfile.mkdtemp()
 
         cls.fallback_server_process = Process(
-            target=_start_fallback_server, args=(cls.fallback_server_dir,))
+            target=_start_fallback_server, args=(cls.fallback_server_dir,)
+        )
         cls.fallback_server_process.start()
 
         fallback_url = 'http://127.0.0.1:{}'.format(_TEST_FALLBACK_PORT_NUMBER)
         cls.server_process = Process(
-            target=_start_migration_server,
-            args=(cls.server_dir, fallback_url))
+            target=_start_migration_server, args=(cls.server_dir, fallback_url)
+        )
         cls.server_process.start()
 
         time.sleep(2)  # give servers some time to start
 
         cls.client = Client(
             cache_dir=cls.cache_dir1,
-            remote_url='http://127.0.0.1:{}'.format(_TEST_PRIMARY_PORT_NUMBER))
+            remote_url='http://127.0.0.1:{}'.format(_TEST_PRIMARY_PORT_NUMBER),
+        )
 
-        cls.fallback_client = Client(
-            cache_dir=cls.cache_dir2,
-            remote_url=fallback_url)
+        cls.fallback_client = Client(cache_dir=cls.cache_dir2, remote_url=fallback_url)
 
     @classmethod
     def tearDownClass(cls):
@@ -114,7 +114,8 @@ class MigrationTest(unittest.TestCase):
         self.fallback_client.put_file('/fallback_version.txt', temp_file)
 
         self.assertGreaterEqual(
-                self.client.file_version('/fallback_version.txt'), timestamp)
+            self.client.file_version('/fallback_version.txt'), timestamp
+        )
 
     def test_file_version_of_not_existent_file_should_return_404(self):
         with self.assertRaisesRegexp(FiletrackerError, "404"):
@@ -122,10 +123,30 @@ class MigrationTest(unittest.TestCase):
 
 
 def _start_fallback_server(server_dir):
-    server_main(['-p', str(_TEST_FALLBACK_PORT_NUMBER), '-d', server_dir, '-D',
-                 '--workers', '4'])
+    server_main(
+        [
+            '-p',
+            str(_TEST_FALLBACK_PORT_NUMBER),
+            '-d',
+            server_dir,
+            '-D',
+            '--workers',
+            '4',
+        ]
+    )
 
 
 def _start_migration_server(server_dir, fallback_url):
-    server_main(['-p', str(_TEST_PRIMARY_PORT_NUMBER), '-d', server_dir, '-D',
-                 '--fallback-url', fallback_url, '--workers', '4'])
+    server_main(
+        [
+            '-p',
+            str(_TEST_PRIMARY_PORT_NUMBER),
+            '-d',
+            server_dir,
+            '-D',
+            '--fallback-url',
+            fallback_url,
+            '--workers',
+            '4',
+        ]
+    )

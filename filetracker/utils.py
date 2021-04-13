@@ -13,8 +13,8 @@ from six import __init__
 def split_name(name):
     """Splits a (possibly versioned) name into unversioned name and version.
 
-       Returns a tuple ``(unversioned_name, version)``, where ``version`` may
-       be ``None``.
+    Returns a tuple ``(unversioned_name, version)``, where ``version`` may
+    be ``None``.
     """
     s = name.rsplit('@', 1)
     if len(s) == 1:
@@ -23,22 +23,22 @@ def split_name(name):
         try:
             return s[0], int(s[1])
         except ValueError:
-            raise ValueError("Invalid Filetracker filename: version must "
-                             "be int, not %r" % (s[1],))
+            raise ValueError(
+                "Invalid Filetracker filename: version must " "be int, not %r" % (s[1],)
+            )
 
 
 def versioned_name(unversioned_name, version):
     """Joins an unversioned name with the specified version.
 
-       Returns a versioned path.
+    Returns a versioned path.
     """
     return unversioned_name + '@' + str(version)
 
 
 def check_name(name, allow_version=True):
     if not isinstance(name, six.string_types):
-        raise ValueError("Invalid Filetracker filename: not string: %r" %
-                        (name,))
+        raise ValueError("Invalid Filetracker filename: not string: %r" % (name,))
     parts = name.split('/')
     if not parts:
         raise ValueError("Invalid Filetracker filename: empty name")
@@ -51,8 +51,9 @@ def check_name(name, allow_version=True):
     if len(parts[-1].split('@')) > 2:
         raise ValueError("Invalid Filetracker filename: multiple versions")
     if '@' in parts[-1] and not allow_version:
-        raise ValueError("Invalid Filetracker filename: version not allowed "
-                         "in this API call")
+        raise ValueError(
+            "Invalid Filetracker filename: version not allowed " "in this API call"
+        )
 
 
 def mkdir(name):
