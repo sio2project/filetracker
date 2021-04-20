@@ -9,7 +9,7 @@ with io.open(
 
 setup(
     name='filetracker',
-    version='2.1.4',
+    version='2.1.5',
     author='SIO2 Project Team',
     author_email='sio2@sio2project.mimuw.edu.pl',
     description='Filetracker caching file storage',
@@ -21,7 +21,7 @@ setup(
     install_requires=[
         'bsddb3==6.2.7',
         'flup6',
-        'gunicorn==19.8.1',
+        'gunicorn==19.9.0',
         'gevent==1.3.1',
         'greenlet==0.4.13',  # for compatibility with this version of gevent
         'progressbar2',
