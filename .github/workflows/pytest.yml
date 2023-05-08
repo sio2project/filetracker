@@ -29,6 +29,7 @@ jobs:
         python -m pip install --upgrade pip wheel setuptools
         python setup.py install_egg_info
         pip install -e .
+        pip install pytest
 
     - name: Run tests
       run: |
