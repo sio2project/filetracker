@@ -21,7 +21,7 @@ from filetracker.servers.run import main as server_main
 # shorter than _CLIENT_WAIT_S (so that the request order is predictable),
 # and _FILE_SIZE is big enough for server to take predictably more time
 # to compress and write the file than the client work time described above.
-_CLIENT_WAIT_S = 0.04
+_CLIENT_WAIT_S = 0.1
 _FILE_SIZE = 6 * 1024 * 1024
 _PARALLEL_CLIENTS = 5
 _TEST_PORT_NUMBER = 45745
