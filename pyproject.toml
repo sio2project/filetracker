@@ -39,6 +39,9 @@ server = [
     "gevent==22.10.2",
     "greenlet==2.0.2",
 ]
+tests = [
+    "pytest",
+]
 
 [project.scripts]
 filetracker = "filetracker.client.shell:main"
