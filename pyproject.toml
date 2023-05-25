@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[metadata]
+name = "filetracker"
+
+[tool.setuptools]
+package-dir = {"filetracker" = "filetracker"}
+
+[project]
+name = "filetracker"
+authors = [
+    {name = "SIO2 Project Team", email = "sio2@sio2project.mimuw.edu.pl"},
+]
+description = "Filetracker caching file storage"
+readme = "README.md"
+requires-python = ">=3.7"
+license = {text = "GPL"}
+classifiers = [
+    "Framework :: Django",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "bsddb3==6.2.7",
+    "flup6",
+    "gunicorn==19.9.0",
+    "progressbar2",
+    "requests",
+    "six",
+]
+version = "2.1.5"
+
+[project.urls] 
+"homepage" = "https://github.com/sio2project/filetracker"
+
+[project.optional-dependencies]
+server = [
+    "gevent==22.10.2",
+    "greenlet==2.0.2",
+]
+tests = [
+    "pytest",
+]
+
+[project.scripts]
+filetracker = "filetracker.client.shell:main"
+filetracker-server = "filetracker.servers.run:main"
+filetracker-cache-cleaner = "filetracker.scripts.cachecleaner:main"
+filetracker-migrate = "filetracker.scripts.migrate:main"
+filetracker-recover = "filetracker.scripts.recover:main"
