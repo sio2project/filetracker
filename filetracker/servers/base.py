@@ -86,48 +86,6 @@ def get_endpoint_and_path(environ):
         return components[0], '/'.join(components[1:])
 
 
-# Deprecated, run.py should be used in all cases.
-def start_cgi(server):
-    from flup.server.cgi import WSGIServer
-
-    WSGIServer(server).run()
-    sys.exit(0)
-
-
-# Deprecated, run.py should be used in all cases.
-def start_fcgi(server):
-    from flup.server.fcgi import WSGIServer
-
-    WSGIServer(server).run()
-    sys.exit(0)
-
-
-# Deprecated, run.py should be used in all cases.
-def start_standalone(server, port=8000):
-    from wsgiref.simple_server import make_server
-
-    httpd = make_server('', port, server)
-    print("Serving on port %d..." % port)
-    httpd.serve_forever()
-
-
-def main(server):
-    """A convenience ``main`` method for running WSGI-compatible HTTP
-    application as CGI, FCGI or standalone (with auto-detection)."""
-
-    if 'REQUEST_METHOD' in os.environ:
-        start_cgi(server)
-
-    stdin_sock = socket.fromfd(0, socket.AF_UNIX, socket.SOCK_STREAM)
-    try:
-        stdin_sock.getpeername()
-    except socket.error as e:
-        if e.errno == errno.ENOTCONN:
-            start_fcgi(server)
-
-    start_standalone(server)
-
-
 def _rindex(l, value):
     """Same as str.rindex, but for lists."""
     return len(l) - l[::-1].index(value) - 1
