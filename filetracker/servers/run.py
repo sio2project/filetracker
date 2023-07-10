@@ -80,7 +80,7 @@ _DEFAULT_LOG_CONFIG_JSON = """
 
 
 def strip_margin(text):
-    return re.sub('\n[ \t]*\|', '\n', text)
+    return re.sub(r'\n[ \t]*\|', '\n', text)
 
 
 def main(args=None):
