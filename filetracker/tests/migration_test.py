@@ -118,7 +118,7 @@ class MigrationTest(unittest.TestCase):
         )
 
     def test_file_version_of_not_existent_file_should_return_404(self):
-        with self.assertRaisesRegexp(FiletrackerError, "404"):
+        with self.assertRaisesRegex(FiletrackerError, "404"):
             self.client.get_stream('/nonexistent.txt')
 
 

@@ -172,11 +172,11 @@ class InteractionTest(unittest.TestCase):
             self.client.get_stream('/older.txt@1')
 
     def test_get_nonexistent_should_404(self):
-        with self.assertRaisesRegexp(FiletrackerError, "404"):
+        with self.assertRaisesRegex(FiletrackerError, "404"):
             self.client.get_stream('/nonexistent.txt')
 
     def test_delete_nonexistent_should_404(self):
-        with self.assertRaisesRegexp(FiletrackerError, "404"):
+        with self.assertRaisesRegex(FiletrackerError, "404"):
             self.client.delete_file('/nonexistent.txt')
 
     def test_delete_should_remove_file_and_dir(self):
@@ -197,7 +197,7 @@ class InteractionTest(unittest.TestCase):
                     ),
                 )
 
-        with self.assertRaisesRegexp(FiletrackerError, "404"):
+        with self.assertRaisesRegex(FiletrackerError, "404"):
             self.client.get_stream('/dir/del.txt')
 
 
