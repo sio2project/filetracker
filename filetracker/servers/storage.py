@@ -27,7 +27,6 @@ from __future__ import division
 from __future__ import print_function
 
 import contextlib
-import email.utils
 import errno
 import fcntl
 import gevent
@@ -497,7 +496,7 @@ def _makedirs(path):
 
 def lutime(path, time):
     if six.PY2:
-        t = email.utils.formatdate(time)
+        t = time.isoformat()
         if subprocess.call(['touch', '-c', '-h', '-d', t, path]) != 0:
             raise RuntimeError
     else:
