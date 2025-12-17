@@ -174,6 +174,10 @@ def main(args=None):
             log_config['loggers']['gunicorn.error']['level'] = options.log_level
             log_config['loggers']['gunicorn.access']['level'] = options.log_level
             log_config['loggers']['']['level'] = options.log_level
+    log_config['root'] = {
+        'level': "WARNING",
+        'handlers': [],
+    }
 
     logging.config.dictConfig(log_config)
 

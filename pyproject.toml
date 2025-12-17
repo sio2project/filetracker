@@ -15,7 +15,7 @@ authors = [
 ]
 description = "Filetracker caching file storage"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.9"
 license = {text = "GPL"}
 classifiers = [
     "Framework :: Django",
@@ -24,7 +24,7 @@ classifiers = [
 dependencies = [
     "bsddb3==6.2.7",
     "flup6",
-    "gunicorn==19.9.0",
+    "gunicorn==23.0.0",
     "progressbar2",
     "requests",
     "six",
@@ -36,8 +36,7 @@ version = "2.2.0"
 
 [project.optional-dependencies]
 server = [
-    "gevent==22.10.2",
-    "greenlet==2.0.2",
+    "gevent==25.9.1"
 ]
 tests = [
     "pytest",
