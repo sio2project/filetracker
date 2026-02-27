@@ -47,6 +47,7 @@ from filetracker.utils import file_digest
 
 _LOCK_RETRIES = 20
 _LOCK_SLEEP_TIME_S = 1
+_DB_DEADLOCK_RETRIES = 50
 
 
 logger = logging.getLogger(__name__)
@@ -81,6 +82,8 @@ class FileStorage(object):
 
         # https://docs.oracle.com/cd/E17076_05/html/programmer_reference/transapp_env_open.html
         self.db_env = bsddb3.db.DBEnv()
+        # Enable running the deadlock detector when lock conflicts are automatically detected.
+        self.db_env.set_lk_detect(bsddb3.db.DB_LOCK_DEFAULT)
         try:
             self.db_env.open(
                 self.db_dir,
@@ -182,8 +185,7 @@ class FileStorage(object):
                     logger.debug('Acquired lock for blob %s.', digest)
                     digest_bytes = digest.encode()
 
-                    with self._db_transaction() as txn:
-                        logger.debug('Started DB transaction (adding link).')
+                    def transaction_contents(txn):
                         link_count = int(self.db.get(digest_bytes, 0, txn=txn))
                         new_count = str(link_count + 1).encode()
                         self.db.put(digest_bytes, new_count, txn=txn)
@@ -194,9 +196,11 @@ class FileStorage(object):
                                 str(logical_size).encode(),
                                 txn=txn,
                             )
-                        logger.debug('Commiting DB transaction (adding link).')
+                        return link_count
 
-                    logger.debug('Committed DB transaction (adding link).')
+                    link_count = self._call_in_transaction_with_retries(
+                        transaction_contents, "adding link"
+                    )
 
                     # Create a new blob if this isn't a duplicate.
                     if link_count == 0:
@@ -268,10 +272,9 @@ class FileStorage(object):
 
             with _exclusive_lock(self._lock_path('blobs', digest)):
                 logger.debug('Acquired lock for blob %s.', digest)
-                should_delete_blob = False
 
-                with self._db_transaction() as txn:
-                    logger.debug('Started DB transaction (deleting link).')
+                def transaction_contents(txn):
+                    should_delete_blob = False
                     digest_bytes = digest.encode()
                     link_count = self.db.get(digest_bytes, txn=txn)
                     if link_count is None:
@@ -288,9 +291,11 @@ class FileStorage(object):
                     else:
                         new_count = str(link_count - 1).encode()
                         self.db.put(digest_bytes, new_count, txn=txn)
-                    logger.debug('Committing DB transaction (deleting link).')
+                    return should_delete_blob
 
-                logger.debug('Committed DB transaction (deleting link).')
+                should_delete_blob = self._call_in_transaction_with_retries(
+                    transaction_contents, "deleting link"
+                )
 
                 os.unlink(link_path)
                 logger.debug('Deleted link %s.', name)
@@ -338,6 +343,30 @@ class FileStorage(object):
             raise
         else:
             txn.commit()
+
+    def _call_in_transaction_with_retries(self, func, description):
+        retries = 0
+        result = None
+        while True:
+            try:
+                with self._db_transaction() as txn:
+                    logger.debug('Started DB transaction ({}).'.format(description))
+                    result = func(txn)
+                    logger.debug('Commiting DB transaction ({}).'.format(description))
+            except bsddb3.db.DBLockDeadlockError:
+                retries += 1
+                if retries > _DB_DEADLOCK_RETRIES:
+                    logger.error('BSDDB deadlock detected, retry limit exceeded ({}).'.format(description))
+                    raise
+                logger.warning(
+                    'BSDDB deadlock detected in transaction ({}), retry no {}.'.format(
+                        description, retries,
+                    )
+                )
+                continue
+            break
+        logger.debug('Committed DB transaction ({}).'.format(description))
+        return result
 
     def _digest_for_link(self, name):
         link = self._link_path(name)
