@@ -186,7 +186,7 @@ class FileStorage(object):
                     digest_bytes = digest.encode()
 
                     def transaction_contents(txn):
-                        link_count = int(self.db.get(digest_bytes, 0, txn=txn))
+                        link_count = int(self.db.get(digest_bytes, 0, txn=txn, flags=bsddb3.db.DB_RMW))
                         new_count = str(link_count + 1).encode()
                         self.db.put(digest_bytes, new_count, txn=txn)
 
@@ -276,7 +276,7 @@ class FileStorage(object):
                 def transaction_contents(txn):
                     should_delete_blob = False
                     digest_bytes = digest.encode()
-                    link_count = self.db.get(digest_bytes, txn=txn)
+                    link_count = self.db.get(digest_bytes, txn=txn, flags=bsddb3.db.DB_RMW)
                     if link_count is None:
                         raise RuntimeError("File exists but has no key in db")
 
