@@ -23,7 +23,6 @@ classifiers = [
 ]
 dependencies = [
     "bsddb3==6.2.7",
-    "flup6",
     "gunicorn==23.0.0",
     "progressbar2",
     "requests",
