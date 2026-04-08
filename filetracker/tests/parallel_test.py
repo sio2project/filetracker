@@ -4,8 +4,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from multiprocessing import Process
+from multiprocessing import Barrier, Process
 import os
+import psutil
 import shutil
 import tempfile
 import time
@@ -25,6 +26,17 @@ _CLIENT_WAIT_S = 0.1
 _FILE_SIZE = 6 * 1024 * 1024
 _PARALLEL_CLIENTS = 5
 _TEST_PORT_NUMBER = 45745
+_COPIES_TO_UPLOAD = 500
+_SUBPROCESS_TIMEOUT_S = 20
+
+
+def kill_process_tree(pid):
+    parent = psutil.Process(pid)
+    for p in parent.children(recursive=True) + [parent]:
+        try:
+            p.kill()
+        except psutil.NoSuchProcess:
+            pass
 
 
 class ParallelTest(unittest.TestCase):
@@ -52,19 +64,23 @@ class ParallelTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        cls.server_process.terminate()
+        kill_process_tree(cls.server_process.pid)
+        cls.server_process.join()
         shutil.rmtree(cls.server_dir)
         shutil.rmtree(cls.temp_dir)
 
     def setUp(self):
         # Shortcuts for convenience
-        self.server_dir = ParallelTest.server_dir
-        self.temp_dir = ParallelTest.temp_dir
-        self.clients = ParallelTest.clients
+        cls = self.__class__
+        self.server_dir = cls.server_dir
+        self.temp_dir = cls.temp_dir
+        self.clients = cls.clients
 
         # For non-parallel requests
-        self.client = ParallelTest.clients[0]
+        self.client = cls.clients[0]
 
+
+class ParallelTestSameFile(ParallelTest):
     def test_only_last_parallel_upload_of_same_file_should_succeed(self):
         processes = []
 
@@ -98,7 +114,43 @@ class ParallelTest(unittest.TestCase):
             self.assertEqual(f.read(), lf.read())
 
 
+class ParallelTestDeadlocks(ParallelTest):
+    def test_bsddb_deadlocks(self):
+        processes = []
+
+        # Initialize different files for every client.
+        for i in range(len(self.clients)):
+            temp_file = os.path.join(self.temp_dir, 'foo{}.txt'.format(i))
+            text = str(i).encode()
+            with open(temp_file, 'wb') as tf:
+                tf.write(text)
+
+        # The deadlocks are visible even without this barrier.
+        barrier = Barrier(len(self.clients))
+
+        def job(id, barrier):
+            temp_file = os.path.join(self.temp_dir, 'foo{}.txt'.format(id))
+            for i in range(0, _COPIES_TO_UPLOAD):
+                ft_name = '/foo{}.{}.txt'.format(id, i)
+                barrier.wait()
+                client.put_file(ft_name, temp_file, compress_hint=False)
+
+        for i, client in enumerate(self.clients):
+            process = Process(target=lambda: job(i, barrier))
+            process.start()
+            processes.append(process)
+
+        for process in processes:
+            process.join(timeout=_SUBPROCESS_TIMEOUT_S)
+            self.assertFalse(process.is_alive())
+            self.assertEqual(process.exitcode, 0)
+            process.join()
+
+        # Put one final file to check for e.g. corruption.
+        client.put_file('/foo_last', temp_file, compress_hint=False)
+
+
 def _start_server(server_dir):
     server_main(
-        ['-p', str(_TEST_PORT_NUMBER), '-d', server_dir, '-D', '--workers', '6']
+        ['-p', str(_TEST_PORT_NUMBER), '-d', server_dir, '-D', '--workers', '3']
     )
