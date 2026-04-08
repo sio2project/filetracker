@@ -3,6 +3,7 @@ dist
 
 .eggs
 .tox
+.coverage*
 .pytest_cache
 .idea
 

@@ -80,7 +80,7 @@ _DEFAULT_LOG_CONFIG_JSON = """
 
 
 def strip_margin(text):
-    return re.sub('\n[ \t]*\|', '\n', text)
+    return re.sub(r'\n[ \t]*\|', '\n', text)
 
 
 def main(args=None):
@@ -174,6 +174,10 @@ def main(args=None):
             log_config['loggers']['gunicorn.error']['level'] = options.log_level
             log_config['loggers']['gunicorn.access']['level'] = options.log_level
             log_config['loggers']['']['level'] = options.log_level
+    log_config['root'] = {
+        'level': "WARNING",
+        'handlers': [],
+    }
 
     logging.config.dictConfig(log_config)
 

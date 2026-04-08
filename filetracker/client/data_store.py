@@ -43,7 +43,8 @@ class DataStore(object):
         Works like :meth:`add_stream`, but ``filename`` is the name of
         an existing file in the filesystem.
         """
-        return self.add_stream(name, open(filename, 'rb'))
+        with open(filename, 'rb') as f:
+            return self.add_stream(name, f)
 
     def exists(self, name):
         """Returns ``True`` if the file exists, ``False`` otherwise.
