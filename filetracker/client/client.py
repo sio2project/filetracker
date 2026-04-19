@@ -338,3 +338,13 @@ class Client(object):
         if self.local_store:
             result.extend(self.local_store.list_files())
         return result
+
+    def list_remote_files(self, version_cutoff_timestamp=None, subpath=""):
+        """Returns list of all stored remote files under `subpath`
+        not newer than `version_cutoff_timestamp`.
+
+        Each element of this list is just a string with the full path.
+        """
+        if not self.remote_store:
+            return []
+        return self.remote_store.list_files(version_cutoff_timestamp, subpath)
