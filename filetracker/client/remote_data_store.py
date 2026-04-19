@@ -222,7 +222,7 @@ class RemoteDataStore(DataStore):
         response.raise_for_status()
 
     @_verbose_http_errors
-    def list_files(self, version, subpath):
+    def list_files(self, version, subpath, absolute_paths):
         if not self._has_capability(SERVER_ACCEPTS_LIST):
             return
         url = self.base_url + '/list' + pathname2url(subpath)
@@ -231,7 +231,11 @@ class RemoteDataStore(DataStore):
         response.raise_for_status()
         result = response.content.decode('utf-8').split('\n')
         assert len(result.pop()) == 0
-        return result
+        if absolute_paths and subpath and subpath != "/":
+            prefix = subpath.rstrip("/").lstrip("/") + "/"
+            return [prefix + path for path in result]
+        else:
+            return result
 
     def _add_version_to_request(self, url, headers, version):
         """Adds version to either url or headers, depending on protocol."""
