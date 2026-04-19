@@ -148,6 +148,35 @@ class InteractionTest(unittest.TestCase):
 
         self.assertNotEqual(version_a, version_b)
 
+    def test_list_remote_files(self):
+        src_file = os.path.join(self.temp_dir, 'older.txt')
+        with open(src_file, 'wb') as sf:
+            sf.write(b'these tests are so bad')
+
+        self.client.put_file('/A@1', src_file)
+        self.client.put_file('/B@5', src_file)
+        self.client.put_file('/C/D@10', src_file)
+
+        def check(expected, *args):
+            result_raw = self.client.list_remote_files(*args)
+            # Filter out files from other tests.
+            result = sorted(filter(lambda x: not x.endswith(".txt"), result_raw))
+            self.assertEqual(result, sorted(expected))
+
+        check(["A", "B", "C/D"])
+        check(["A"], 4)
+        check(["A", "B"], 5)
+        check(["A", "B"], 9)
+        check(["A", "B", "C/D"], 10)
+        with self.assertRaises(FiletrackerError):
+            check(["D"], 10, "C")
+        check(["D"], 10, "/C")
+        check(["D"], 10, "/C/")
+        # absolute_paths=True
+        check(["C/D"], 10, "/C", True)
+        check(["C/D"], 10, "/C/", True)
+        check([], 9, "/C")
+
     def test_put_older_should_fail(self):
         """This test assumes file version is stored in mtime."""
         src_file = os.path.join(self.temp_dir, 'older.txt')
