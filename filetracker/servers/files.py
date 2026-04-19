@@ -156,9 +156,13 @@ class FiletrackerServer(base.Server):
         query_params = self.parse_query_params(environ)
 
         last_modified = query_params.get('last_modified', (None,))[0]
-        if not last_modified:
-            last_modified = int(time.time())
-
+        if last_modified:
+            last_modified = email.utils.parsedate_tz(last_modified)
+            last_modified = email.utils.mktime_tz(last_modified)
+        else:
+            last_modified = time.time()
+        last_modified = int(last_modified)
+        
         logger.debug('Handling GET /list/%s (@%d)', path, last_modified)
 
         root_dir = os.path.join(self.dir, path)

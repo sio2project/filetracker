@@ -40,6 +40,9 @@ SERVER_ACCEPTS_SHA256_DIGEST = 3
 # The server supports deleting files
 SERVER_ACCEPTS_DELETE = 4
 
+# The server supports listing files
+SERVER_ACCEPTS_LIST = 5
+
 _PROTOCOL_CAPABILITIES = {
     1: [
         SERVER_REQUIRES_VERSION_HEADER,
@@ -48,6 +51,7 @@ _PROTOCOL_CAPABILITIES = {
         SERVER_ACCEPTS_GZIP,
         SERVER_ACCEPTS_SHA256_DIGEST,
         SERVER_ACCEPTS_DELETE,
+        SERVER_ACCEPTS_LIST,
     ],
 }
 
@@ -216,6 +220,22 @@ class RemoteDataStore(DataStore):
         url, headers = self._add_version_to_request(url, {}, version)
         response = requests.delete(url, headers=headers)
         response.raise_for_status()
+
+    @_verbose_http_errors
+    def list_files(self, version, subpath, absolute_paths):
+        if not self._has_capability(SERVER_ACCEPTS_LIST):
+            return
+        url = self.base_url + '/list' + pathname2url(subpath)
+        url, headers = self._add_version_to_request(url, {}, version)
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        result = response.content.decode('utf-8').split('\n')
+        assert len(result.pop()) == 0
+        if absolute_paths and subpath and subpath != "/":
+            prefix = subpath.rstrip("/").lstrip("/") + "/"
+            return [prefix + path for path in result]
+        else:
+            return result
 
     def _add_version_to_request(self, url, headers, version):
         """Adds version to either url or headers, depending on protocol."""
