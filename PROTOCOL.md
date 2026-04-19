@@ -97,7 +97,7 @@ slashes.
 
 The response is plain-text, with one line for every file path.
 
-Version cutoff must be specified in RFC 2822 format through
+Version cutoff may be specified in RFC 2822 format through
 `?last_modified=` query parameter. Only files with modification time
 older than this version will be listed.
 
