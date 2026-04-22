@@ -5,6 +5,7 @@ from __future__ import division
 from __future__ import print_function
 
 from multiprocessing import Process
+import email.utils
 import os
 import shutil
 import tempfile
@@ -66,6 +67,31 @@ class ProtocolTest(unittest.TestCase):
 
         self.assertEqual(lines.count('list_a.txt'), 1)
         self.assertEqual(lines.count('list_b.txt'), 1)
+
+    def test_list_files_version_cutoff_should_work(self):
+        src_file = os.path.join(self.temp_dir, 'list.txt')
+        with open(src_file, 'wb') as sf:
+            sf.write(b'hello list')
+
+        self.client.put_file('/A@1', src_file)
+        self.client.put_file('/B@100', src_file)
+        self.client.put_file('/C@200', src_file)
+
+        def check(timestamp, expected):
+            date = email.utils.formatdate(timestamp)
+            params = {'last_modified': date}
+            res = requests.get('http://127.0.0.1:{}/list/'.format(_TEST_PORT_NUMBER), params=params)
+            self.assertEqual(res.status_code, 200)
+            # Filter out files from other tests.
+            lines = [l for l in res.text.split('\n') if l]
+            self.assertCountEqual(lines, expected)
+
+        check(0, [])
+        check(1, ['A'])
+        check(99, ['A'])
+        check(100, ['A', 'B'])
+        check(199, ['A', 'B'])
+        check(200, ['A', 'B', 'C'])
 
     def test_list_files_in_subdirectory_should_work(self):
         src_file = os.path.join(self.temp_dir, 'list_sub.txt')
