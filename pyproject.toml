@@ -28,7 +28,7 @@ dependencies = [
     "requests",
     "six",
 ]
-version = "2.3.1"
+version = "2.3.3"
 
 [project.urls] 
 "homepage" = "https://github.com/sio2project/filetracker"
